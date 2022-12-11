@@ -1,11 +1,11 @@
 {
     "Version": "1.1",
     "Data": {
-        "Source": "c:\\users\\trand\\documents\\unreal projects\\plagued\\plugins\\developer\\riderlink\\source\\rd\\rd.cpp",
+        "Source": "c:\\users\\trand\\documents\\github\\plagued\\plagued\\plugins\\developer\\riderlink\\source\\rd\\rd.cpp",
         "ProvidedModule": "",
         "Includes": [
-            "c:\\users\\trand\\documents\\unreal projects\\plagued\\plugins\\developer\\riderlink\\intermediate\\build\\win64\\unrealeditor\\development\\rd\\definitions.h",
-            "c:\\users\\trand\\documents\\unreal projects\\plagued\\plugins\\developer\\riderlink\\source\\rd\\rd.h",
+            "c:\\users\\trand\\documents\\github\\plagued\\plagued\\plugins\\developer\\riderlink\\intermediate\\build\\win64\\unrealeditor\\development\\rd\\definitions.h",
+            "c:\\users\\trand\\documents\\github\\plagued\\plagued\\plugins\\developer\\riderlink\\source\\rd\\rd.h",
             "c:\\ue_5.1\\engine\\source\\runtime\\core\\public\\logging\\logmacros.h",
             "c:\\ue_5.1\\engine\\source\\runtime\\core\\public\\containers\\unrealstring.h",
             "c:\\ue_5.1\\engine\\source\\runtime\\core\\public\\coretypes.h",

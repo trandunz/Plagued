@@ -52,17 +52,6 @@ void UTP_WeaponComponent::Fire()
 	{
 		UGameplayStatics::PlaySoundAtLocation(this, FireSound, Character->GetActorLocation());
 	}
-	
-	// Try and play a firing animation if specified
-	if (FireAnimation != nullptr)
-	{
-		// Get the animation object for the arms mesh
-		UAnimInstance* AnimInstance = Character->GetMesh1P()->GetAnimInstance();
-		if (AnimInstance != nullptr)
-		{
-			AnimInstance->Montage_Play(FireAnimation, 1.f);
-		}
-	}
 }
 
 void UTP_WeaponComponent::AttachWeapon(APlaguedCharacter* TargetCharacter)
@@ -78,7 +67,7 @@ void UTP_WeaponComponent::AttachWeapon(APlaguedCharacter* TargetCharacter)
 
 	GetOwner()->SetOwner(Character->GetOwner());
 	
-	AttachToComponent(Character->GetMesh1P(), AttachmentRules, FName(TEXT("GripPoint")));
+	//AttachToComponent(Character->GetOwner()-, AttachmentRules, FName(TEXT("GripPoint")));
 	
 	// switch bHasRifle so the animation blueprint can switch to another animation set
 	Character->SetRifle(this);

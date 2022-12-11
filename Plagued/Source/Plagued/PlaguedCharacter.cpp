@@ -5,9 +5,14 @@
 #include "Animation/AnimInstance.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Blueprint/UserWidget.h"
+#include "CW_HUD.h"
+#include "CW_Inventory.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "Pickup_Base.h"
 #include "TP_WeaponComponent.h"
+#include "GameFramework/GameSession.h"
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -20,22 +25,22 @@ APlaguedCharacter::APlaguedCharacter()
 	
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(55.f, 96.0f);
-		
-	// Create a CameraComponent	
+	
 	FirstPersonCameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
-	FirstPersonCameraComponent->SetupAttachment(GetCapsuleComponent());
-	FirstPersonCameraComponent->SetRelativeLocation(FVector(-10.f, 0.f, 60.f)); // Position the camera
 	FirstPersonCameraComponent->bUsePawnControlRotation = true;
 
-	// Create a mesh component that will be used when being viewed from a '1st person' view (when controlling this pawn)
-	Mesh1P = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("CharacterMesh1P"));
-	Mesh1P->SetOnlyOwnerSee(true);
-	Mesh1P->SetupAttachment(FirstPersonCameraComponent);
-	Mesh1P->bCastDynamicShadow = false;
-	Mesh1P->CastShadow = false;
-	//Mesh1P->SetRelativeRotation(FRotator(0.9f, -19.19f, 5.2f));
-	Mesh1P->SetRelativeLocation(FVector(-30.f, 0.f, -150.f));
+	// Create Arm
+	Arm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
+	Arm->TargetArmLength = 300.0f;
+	Arm->SetRelativeRotation(FRotator(-45.0f, 0.0f, 0.0f));
 
+	// Init Arm Lag
+	//Arm->bEnableCameraLag = true;
+	//Arm->CameraLagSpeed = 2.0f;
+	//Arm->CameraLagMaxDistance = 1.5f;
+	//Arm->bEnableCameraRotationLag =true;
+	//Arm->CameraRotationLagSpeed = 4.0f;
+	//Arm->CameraLagMaxTimeStep = 1.0f;
 }
 
 void APlaguedCharacter::BeginPlay()
@@ -51,6 +56,33 @@ void APlaguedCharacter::BeginPlay()
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
 		}
 	}
+
+	ToggleHUD();
+}
+
+void APlaguedCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (PlayerHUD)
+	{
+		PlayerHUD->RemoveFromParent();
+		PlayerHUD = nullptr;
+	}
+	if (PlayerInventory)
+	{
+		PlayerInventory->RemoveFromParent();
+		PlayerInventory = nullptr;
+	}
+	Super::EndPlay(EndPlayReason);
+}
+
+void APlaguedCharacter::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	FAttachmentTransformRules AttachmentRules(EAttachmentRule::KeepRelative, false);
+	Arm->AttachToComponent(RootComponent, AttachmentRules);
+	
+	AttachCameraToFPP();
 }
 
 void APlaguedCharacter::Tick(const float DeltaSeconds)
@@ -64,6 +96,113 @@ void APlaguedCharacter::Tick(const float DeltaSeconds)
 	else
 	{
 		GetFirstPersonCameraComponent()->SetFieldOfView(FMath::Lerp(GetFirstPersonCameraComponent()->FieldOfView, 80.0f, DeltaSeconds * 10.0f));
+	}
+
+	InteractRaycast();
+}
+
+void APlaguedCharacter::AttachCameraToTPP()
+{
+	FAttachmentTransformRules AttachmentRules(EAttachmentRule::KeepRelative, false);
+	FirstPersonCameraComponent->AttachToComponent(Arm, AttachmentRules, USpringArmComponent::SocketName);
+}
+
+void APlaguedCharacter::AttachCameraToFPP()
+{
+	FAttachmentTransformRules AttachmentRules(EAttachmentRule::KeepRelative, false);
+	FirstPersonCameraComponent->AttachToComponent(GetMesh(), AttachmentRules, FName("head"));
+}
+
+void APlaguedCharacter::ChangePerspective()
+{
+	M_IsFirstPerson = !M_IsFirstPerson;
+
+	if (M_IsFirstPerson)
+	{
+		AttachCameraToFPP();
+	}
+	else
+	{
+		AttachCameraToTPP();
+	}
+}
+
+void APlaguedCharacter::InteractRaycast()
+{
+	FHitResult* result = new FHitResult;
+	FVector startTrace = GetFirstPersonCameraComponent()->GetComponentLocation();
+	FVector traceDir = GetFirstPersonCameraComponent()->GetForwardVector();
+	FVector endTrace = traceDir * 500.0f + startTrace;
+	FCollisionQueryParams* queryParams = new FCollisionQueryParams;
+
+	UE_LOG(LogTemp, Warning, TEXT("Interact Raycast"));
+
+	if (PlayerHUD)
+		PlayerHUD->ShowInteractText(false);
+	
+	if (GetWorld()->LineTraceSingleByChannel(*result, startTrace, endTrace, ECC_Visibility, *queryParams))
+	{
+		if (APickup_Base* pickup = Cast<APickup_Base>(result->GetActor()))
+		{
+			PlayerHUD->ShowInteractText(true);
+		}
+	}
+
+	LastRaycastHit = result;
+}
+
+void APlaguedCharacter::TryPickup()
+{
+	if (LastRaycastHit)
+	{
+		if (APickup_Base* pickup = Cast<APickup_Base>(LastRaycastHit->GetActor()))
+		{
+			PickupItem(pickup);
+		}
+	}
+}
+
+void APlaguedCharacter::ToggleInventoryMenu()
+{
+	if (IsLocallyControlled() && PlayerInventoryClass)
+	{
+		if (PlayerInventory)
+		{
+			PlayerInventory->RemoveFromParent();
+			PlayerInventory = nullptr;
+
+			ToggleHUD();
+		}
+		else
+		{
+			APlayerController* controller = GetController<APlayerController>();
+			check(controller);
+			PlayerInventory = CreateWidget<UCW_Inventory>(controller, PlayerInventoryClass);
+			check(PlayerInventory);
+			PlayerInventory->AddToPlayerScreen();
+
+			ToggleHUD();
+		}
+	}
+}
+
+void APlaguedCharacter::ToggleHUD()
+{
+	if (IsLocallyControlled() && PlayerHUDClass)
+	{
+		if (PlayerHUD)
+		{
+			PlayerHUD->RemoveFromParent();
+			PlayerHUD = nullptr;
+		}
+		else
+		{
+			APlayerController* controller = GetController<APlayerController>();
+			check(controller);
+			PlayerHUD = CreateWidget<UCW_HUD>(controller, PlayerHUDClass);
+			check(PlayerHUD);
+			PlayerHUD->AddToPlayerScreen();
+		}
 	}
 }
 
@@ -90,6 +229,12 @@ void APlaguedCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 
 		EnhancedInputComponent->BindAction(ZoomAction, ETriggerEvent::Triggered, this, &APlaguedCharacter::Zoom);
 		EnhancedInputComponent->BindAction(ZoomAction, ETriggerEvent::Completed, this, &APlaguedCharacter::StopZoom);
+
+		EnhancedInputComponent->BindAction(ChangePerspectiveAction, ETriggerEvent::Triggered, this, &APlaguedCharacter::ChangePerspective);
+
+		EnhancedInputComponent->BindAction(Interact, ETriggerEvent::Triggered, this, &APlaguedCharacter::TryPickup);
+
+		EnhancedInputComponent->BindAction(ToggleInventory, ETriggerEvent::Triggered, this, &APlaguedCharacter::ToggleInventoryMenu);
 	}
 }
 
@@ -181,6 +326,20 @@ void APlaguedCharacter::FireWeapon()
 	}
 }
 
+void APlaguedCharacter::PickupItem(APickup_Base* _pickup)
+{
+	GetHUD()->SetSlot(_pickup->Icon, 0);
+	
+	if (!HasAuthority())
+	{
+		Server_PickupItem(_pickup);
+	}
+	else
+	{
+		_pickup->Pickup(this);
+	}
+}
+
 bool APlaguedCharacter::Server_FireWeapon_Validate()
 {
 	return true;
@@ -192,4 +351,14 @@ void APlaguedCharacter::Server_FireWeapon_Implementation()
 	{
 		M_CurrentWeapon->Fire();
 	}
+}
+
+bool APlaguedCharacter::Server_PickupItem_Validate(APickup_Base* _pickup)
+{
+	return true;
+}
+
+void APlaguedCharacter::Server_PickupItem_Implementation(APickup_Base* _pickup)
+{
+	_pickup->Pickup(this);
 }

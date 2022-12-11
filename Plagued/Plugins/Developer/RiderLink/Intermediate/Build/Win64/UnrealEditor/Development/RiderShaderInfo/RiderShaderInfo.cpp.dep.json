@@ -1,11 +1,11 @@
 {
     "Version": "1.1",
     "Data": {
-        "Source": "c:\\users\\trand\\documents\\unreal projects\\plagued\\plugins\\developer\\riderlink\\source\\ridershaderinfo\\ridershaderinfo.cpp",
+        "Source": "c:\\users\\trand\\documents\\github\\plagued\\plagued\\plugins\\developer\\riderlink\\source\\ridershaderinfo\\ridershaderinfo.cpp",
         "ProvidedModule": "",
         "Includes": [
-            "c:\\users\\trand\\documents\\unreal projects\\plagued\\plugins\\developer\\riderlink\\intermediate\\build\\win64\\unrealeditor\\development\\ridershaderinfo\\definitions.h",
-            "c:\\users\\trand\\documents\\unreal projects\\plagued\\plugins\\developer\\riderlink\\source\\ridershaderinfo\\ridershaderinfo.h",
+            "c:\\users\\trand\\documents\\github\\plagued\\plagued\\plugins\\developer\\riderlink\\intermediate\\build\\win64\\unrealeditor\\development\\ridershaderinfo\\definitions.h",
+            "c:\\users\\trand\\documents\\github\\plagued\\plagued\\plugins\\developer\\riderlink\\source\\ridershaderinfo\\ridershaderinfo.h",
             "c:\\ue_5.1\\engine\\source\\runtime\\core\\public\\modules\\moduleinterface.h",
             "c:\\ue_5.1\\engine\\source\\runtime\\core\\public\\coretypes.h",
             "c:\\ue_5.1\\engine\\source\\runtime\\core\\public\\hal\\platform.h",

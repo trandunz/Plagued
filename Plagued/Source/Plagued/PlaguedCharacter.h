@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "PlaguedCharacter.generated.h"
 
 class UInputComponent;
@@ -18,17 +19,22 @@ UCLASS(config=Game)
 class APlaguedCharacter : public ACharacter
 {
 	GENERATED_BODY()
-
-	/** Pawn mesh: 1st person view (arms; seen only by self) */
-	UPROPERTY(VisibleDefaultsOnly, Category=Mesh)
-	USkeletalMeshComponent* Mesh1P;
-
+	
 	/** First person camera */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=MyCharacter, meta=(AllowPrivateAccess = "true"))
 	UCameraComponent* FirstPersonCameraComponent;
 
+	UPROPERTY()
+	USpringArmComponent* Arm;
+	
+	UPROPERTY()
+	class UCW_HUD* PlayerHUD;
+
+	UPROPERTY()
+	class UCW_Inventory* PlayerInventory;
+	
 	/** MappingContext */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=In1put, meta=(AllowPrivateAccess = "true"))
 	class UInputMappingContext* DefaultMappingContext;
 
 	/** Jump Input Action */
@@ -47,14 +53,42 @@ class APlaguedCharacter : public ACharacter
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
 	class UInputAction* ZoomAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
+	class UInputAction* ChangePerspectiveAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
+	class UInputAction* Interact;
 	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
+	class UInputAction* ToggleInventory;
+
 public:
 	APlaguedCharacter();
 
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<class UCW_HUD> PlayerHUDClass;
+
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<class UCW_Inventory> PlayerInventoryClass;
+
 protected:
 	virtual void BeginPlay();
-
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void Tick(float DeltaSeconds) override;
+
+	void AttachCameraToTPP();
+	void AttachCameraToFPP();
+	void ChangePerspective();
+	
+	void InteractRaycast();
+	void TryPickup();
+
+	void ToggleInventoryMenu();
+	void ToggleHUD();
+
+	FHitResult* LastRaycastHit = nullptr;
 public:
 		
 	/** Look Input Action */
@@ -81,7 +115,9 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void FireWeapon();
-	
+
+	UFUNCTION(BlueprintCallable)
+	void PickupItem(APickup_Base* _pickup);
 protected:
 	/** Called for movement input */
 	void Move(const FInputActionValue& Value);
@@ -94,6 +130,7 @@ protected:
 
 	bool M_IsZooming = false;
 	float M_ZoomRatio = 0.0f;
+	bool M_IsFirstPerson = true;
 
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_Test();
@@ -105,6 +142,11 @@ protected:
 	bool Server_FireWeapon_Validate();
 	void Server_FireWeapon_Implementation();
 
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_PickupItem(APickup_Base* _pickup);
+	bool Server_PickupItem_Validate(APickup_Base* _pickup);
+	void Server_PickupItem_Implementation(APickup_Base* _pickup);
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
 	UTP_WeaponComponent* M_CurrentWeapon = nullptr;
 protected:
@@ -113,10 +155,10 @@ protected:
 	// End of APawn interface
 
 public:
-	/** Returns Mesh1P subobject **/
-	USkeletalMeshComponent* GetMesh1P() const { return Mesh1P; }
+	
 	/** Returns FirstPersonCameraComponent subobject **/
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
 
+	UCW_HUD* GetHUD() const {return PlayerHUD;}
 
 };
