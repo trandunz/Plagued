@@ -83,7 +83,7 @@ protected:
 	void ChangePerspective();
 	
 	void InteractRaycast();
-	void TryPickup();
+	void TryInteract();
 
 	void ToggleInventoryMenu();
 	void ToggleHUD();
@@ -118,6 +118,9 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void PickupItem(APickup_Base* _pickup);
+
+	UFUNCTION(BlueprintCallable)
+	void OpenDoor(ADoor_Base* _door);
 protected:
 	/** Called for movement input */
 	void Move(const FInputActionValue& Value);
@@ -146,6 +149,11 @@ protected:
 	void Server_PickupItem(APickup_Base* _pickup);
 	bool Server_PickupItem_Validate(APickup_Base* _pickup);
 	void Server_PickupItem_Implementation(APickup_Base* _pickup);
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_OpenDoor(ADoor_Base* _door);
+	bool Server_OpenDoor_Validate(ADoor_Base* _door);
+	void Server_OpenDoor_Implementation(ADoor_Base* _door);
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
 	UTP_WeaponComponent* M_CurrentWeapon = nullptr;

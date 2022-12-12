@@ -11,6 +11,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Pickup_Base.h"
+#include "Door_Base.h"
 #include "TP_WeaponComponent.h"
 #include "GameFramework/GameSession.h"
 
@@ -135,8 +136,6 @@ void APlaguedCharacter::InteractRaycast()
 	FVector endTrace = traceDir * 500.0f + startTrace;
 	FCollisionQueryParams* queryParams = new FCollisionQueryParams;
 
-	UE_LOG(LogTemp, Warning, TEXT("Interact Raycast"));
-
 	if (PlayerHUD)
 		PlayerHUD->ShowInteractText(false);
 	
@@ -144,20 +143,30 @@ void APlaguedCharacter::InteractRaycast()
 	{
 		if (APickup_Base* pickup = Cast<APickup_Base>(result->GetActor()))
 		{
-			PlayerHUD->ShowInteractText(true);
+			if (PlayerHUD)
+				PlayerHUD->ShowInteractText(true);
+		}
+		if (ADoor_Base* door = Cast<ADoor_Base>(result->GetActor()))
+		{
+			if (PlayerHUD)
+				PlayerHUD->ShowInteractText(true);
 		}
 	}
 
 	LastRaycastHit = result;
 }
 
-void APlaguedCharacter::TryPickup()
+void APlaguedCharacter::TryInteract()
 {
 	if (LastRaycastHit)
 	{
 		if (APickup_Base* pickup = Cast<APickup_Base>(LastRaycastHit->GetActor()))
 		{
 			PickupItem(pickup);
+		}
+		if (ADoor_Base* door = Cast<ADoor_Base>(LastRaycastHit->GetActor()))
+		{
+			OpenDoor(door);
 		}
 	}
 }
@@ -232,7 +241,7 @@ void APlaguedCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 
 		EnhancedInputComponent->BindAction(ChangePerspectiveAction, ETriggerEvent::Triggered, this, &APlaguedCharacter::ChangePerspective);
 
-		EnhancedInputComponent->BindAction(Interact, ETriggerEvent::Triggered, this, &APlaguedCharacter::TryPickup);
+		EnhancedInputComponent->BindAction(Interact, ETriggerEvent::Triggered, this, &APlaguedCharacter::TryInteract);
 
 		EnhancedInputComponent->BindAction(ToggleInventory, ETriggerEvent::Triggered, this, &APlaguedCharacter::ToggleInventoryMenu);
 	}
@@ -340,6 +349,18 @@ void APlaguedCharacter::PickupItem(APickup_Base* _pickup)
 	}
 }
 
+void APlaguedCharacter::OpenDoor(ADoor_Base* _door)
+{
+	if (!HasAuthority())
+	{
+		Server_OpenDoor(_door);
+	}
+	else
+	{
+		_door->Interact(GetActorLocation());
+	}
+}
+
 bool APlaguedCharacter::Server_FireWeapon_Validate()
 {
 	return true;
@@ -361,4 +382,14 @@ bool APlaguedCharacter::Server_PickupItem_Validate(APickup_Base* _pickup)
 void APlaguedCharacter::Server_PickupItem_Implementation(APickup_Base* _pickup)
 {
 	_pickup->Pickup(this);
+}
+
+bool APlaguedCharacter::Server_OpenDoor_Validate(ADoor_Base* _door)
+{
+	return true;
+}
+
+void APlaguedCharacter::Server_OpenDoor_Implementation(ADoor_Base* _door)
+{
+	_door->Interact(GetActorLocation());
 }
