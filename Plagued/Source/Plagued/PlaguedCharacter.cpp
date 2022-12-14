@@ -11,9 +11,11 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Pickup_Base.h"
+#include "Weapon_Melee.h"
 #include "Door_Base.h"
 #include "TP_WeaponComponent.h"
 #include "GameFramework/GameSession.h"
+#include "Net/UnrealNetwork.h"
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -21,6 +23,9 @@
 
 APlaguedCharacter::APlaguedCharacter()
 {
+	bReplicates = true;
+	bAlwaysRelevant = true;
+	
 	// Character doesnt have a rifle at start
 	bHasRifle = false;
 	
@@ -29,11 +34,16 @@ APlaguedCharacter::APlaguedCharacter()
 	
 	FirstPersonCameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
 	FirstPersonCameraComponent->bUsePawnControlRotation = true;
+	AttachCameraToFPP();
 
 	// Create Arm
 	Arm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
 	Arm->TargetArmLength = 300.0f;
 	Arm->SetRelativeRotation(FRotator(-45.0f, 0.0f, 0.0f));
+
+	MeleeWeaponSocket = CreateDefaultSubobject<USceneComponent>(TEXT("Melee_Weapon_Socket"));
+	FAttachmentTransformRules AttachmentRules(EAttachmentRule::KeepRelative, false);
+	MeleeWeaponSocket->AttachToComponent(GetMesh(), AttachmentRules, FName("RightHandIndex1"));
 
 	// Init Arm Lag
 	//Arm->bEnableCameraLag = true;
@@ -42,6 +52,15 @@ APlaguedCharacter::APlaguedCharacter()
 	//Arm->bEnableCameraRotationLag =true;
 	//Arm->CameraRotationLagSpeed = 4.0f;
 	//Arm->CameraLagMaxTimeStep = 1.0f;
+}
+
+void APlaguedCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(APlaguedCharacter, IsMeleeStance);
+	DOREPLIFETIME(APlaguedCharacter, TryMeleeAttack);
+	DOREPLIFETIME(APlaguedCharacter, CanMeleeAttack);
 }
 
 void APlaguedCharacter::BeginPlay()
@@ -59,6 +78,8 @@ void APlaguedCharacter::BeginPlay()
 	}
 
 	ToggleHUD();
+
+	ToggleWeapon();
 }
 
 void APlaguedCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -89,7 +110,7 @@ void APlaguedCharacter::OnConstruction(const FTransform& Transform)
 void APlaguedCharacter::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-
+	
 	if (M_IsZooming)
 	{
 		GetFirstPersonCameraComponent()->SetFieldOfView(FMath::Lerp(GetFirstPersonCameraComponent()->FieldOfView, 40.0f, DeltaSeconds * 10.0f));
@@ -100,7 +121,7 @@ void APlaguedCharacter::Tick(const float DeltaSeconds)
 	}
 
 	InteractRaycast();
-}
+ }
 
 void APlaguedCharacter::AttachCameraToTPP()
 {
@@ -111,7 +132,7 @@ void APlaguedCharacter::AttachCameraToTPP()
 void APlaguedCharacter::AttachCameraToFPP()
 {
 	FAttachmentTransformRules AttachmentRules(EAttachmentRule::KeepRelative, false);
-	FirstPersonCameraComponent->AttachToComponent(GetMesh(), AttachmentRules, FName("head"));
+	FirstPersonCameraComponent->AttachToComponent(GetMesh(), AttachmentRules, FName("Head"));
 }
 
 void APlaguedCharacter::ChangePerspective()
@@ -215,6 +236,31 @@ void APlaguedCharacter::ToggleHUD()
 	}
 }
 
+void APlaguedCharacter::StartAim()
+{
+	IsMeleeStance = true;
+}
+
+void APlaguedCharacter::EndAim()
+{
+	IsMeleeStance = false;
+}
+
+void APlaguedCharacter::TryMelee()
+{
+	Multi_TryMelee();
+}
+
+void APlaguedCharacter::Jump()
+{
+	Super::Jump();
+}
+
+void APlaguedCharacter::StopJumping()
+{
+	Super::StopJumping();
+}
+
 //////////////////////////////////////////////////////////////////////////// Input
 
 void APlaguedCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
@@ -223,7 +269,7 @@ void APlaguedCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 	if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(PlayerInputComponent))
 	{
 		//Jumping
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &ACharacter::Jump);
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &APlaguedCharacter::Jump);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
 		//Moving
@@ -234,7 +280,7 @@ void APlaguedCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 
 		EnhancedInputComponent->BindAction(TestAction, ETriggerEvent::Triggered, this, &APlaguedCharacter::Test);
 
-		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &APlaguedCharacter::FireWeapon);
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &APlaguedCharacter::TryMelee);
 
 		EnhancedInputComponent->BindAction(ZoomAction, ETriggerEvent::Triggered, this, &APlaguedCharacter::Zoom);
 		EnhancedInputComponent->BindAction(ZoomAction, ETriggerEvent::Completed, this, &APlaguedCharacter::StopZoom);
@@ -244,6 +290,9 @@ void APlaguedCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 		EnhancedInputComponent->BindAction(Interact, ETriggerEvent::Triggered, this, &APlaguedCharacter::TryInteract);
 
 		EnhancedInputComponent->BindAction(ToggleInventory, ETriggerEvent::Triggered, this, &APlaguedCharacter::ToggleInventoryMenu);
+
+		EnhancedInputComponent->BindAction(Aim, ETriggerEvent::Triggered, this, &APlaguedCharacter::StartAim);
+		EnhancedInputComponent->BindAction(Aim, ETriggerEvent::Completed, this, &APlaguedCharacter::EndAim);
 	}
 }
 
@@ -361,6 +410,20 @@ void APlaguedCharacter::OpenDoor(ADoor_Base* _door)
 	}
 }
 
+void APlaguedCharacter::ToggleWeapon(TSubclassOf<class AWeapon_Melee> _weaponClass)
+{
+	if (M_MeleeWeapon != nullptr)
+	{
+		M_MeleeWeapon->Destroy();
+	}
+	else if (MeleeAsset != nullptr)
+	{
+		M_MeleeWeapon = GetWorld()->SpawnActor<AWeapon_Melee>(MeleeAsset);
+		FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
+		M_MeleeWeapon->AttachToComponent(MeleeWeaponSocket, AttachmentRules);
+	}
+}
+
 bool APlaguedCharacter::Server_FireWeapon_Validate()
 {
 	return true;
@@ -392,4 +455,32 @@ bool APlaguedCharacter::Server_OpenDoor_Validate(ADoor_Base* _door)
 void APlaguedCharacter::Server_OpenDoor_Implementation(ADoor_Base* _door)
 {
 	_door->Interact(GetActorLocation());
+}
+
+bool APlaguedCharacter::Multi_TryMelee_Validate()
+{
+	return true;
+}
+
+void APlaguedCharacter::Multi_TryMelee_Implementation()
+{
+	if (IsMeleeStance && CanMeleeAttack)
+	{
+		CanMeleeAttack = false;
+		TryMeleeAttack = true;
+	}
+}
+
+bool APlaguedCharacter::Server_TryMelee_Validate()
+{
+	return true;
+}
+
+void APlaguedCharacter::Server_TryMelee_Implementation()
+{
+	if (IsMeleeStance && CanMeleeAttack)
+	{
+		CanMeleeAttack = false;
+		TryMeleeAttack = true;
+	}
 }

@@ -22,6 +22,14 @@ ADoor_Base::ADoor_Base()
 	
 	Handle = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Handle"));
 	Handle->SetupAttachment(Door);
+
+	Collider = CreateDefaultSubobject<UBoxComponent>(TEXT("Collider"));
+	Collider->SetWorldScale3D({1.0f, 1.0f, 1.0f});
+	Collider->SetupAttachment(Door);
+	Collider->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	Collider->SetCollisionObjectType(ECollisionChannel::ECC_MAX);
+	Collider->SetRelativeLocation({0.0f, 0.0f, 50.0f});
+	Collider->SetBoxExtent({50.0f, 10.0f, 100.0f});
 }
 
 void ADoor_Base::Interact(FVector _instigatorForward)

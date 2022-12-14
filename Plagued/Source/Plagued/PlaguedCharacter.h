@@ -24,6 +24,12 @@ class APlaguedCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=MyCharacter, meta=(AllowPrivateAccess = "true"))
 	UCameraComponent* FirstPersonCameraComponent;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=MyCharacter, meta=(AllowPrivateAccess = "true"))
+	USceneComponent* MeleeWeaponSocket;
+	
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<class AWeapon_Melee> MeleeAsset;
+	
 	UPROPERTY()
 	USpringArmComponent* Arm;
 	
@@ -63,9 +69,26 @@ class APlaguedCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
 	class UInputAction* ToggleInventory;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
+	class UInputAction* Aim;
+
 public:
 	APlaguedCharacter();
 
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	
+	void Jump();
+	void StopJumping();
+	
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly);
+	bool IsMeleeStance = false;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly);
+	bool TryMeleeAttack = false;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadWrite);
+	bool CanMeleeAttack = false;
+	
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<class UCW_HUD> PlayerHUDClass;
 
@@ -87,6 +110,11 @@ protected:
 
 	void ToggleInventoryMenu();
 	void ToggleHUD();
+
+	void StartAim();
+	void EndAim();
+
+	void TryMelee();
 
 	FHitResult* LastRaycastHit = nullptr;
 public:
@@ -121,6 +149,9 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void OpenDoor(ADoor_Base* _door);
+
+	UFUNCTION(BlueprintCallable)
+	void ToggleWeapon(TSubclassOf<class AWeapon_Melee> _weaponClass = nullptr);
 protected:
 	/** Called for movement input */
 	void Move(const FInputActionValue& Value);
@@ -154,9 +185,23 @@ protected:
 	void Server_OpenDoor(ADoor_Base* _door);
 	bool Server_OpenDoor_Validate(ADoor_Base* _door);
 	void Server_OpenDoor_Implementation(ADoor_Base* _door);
+	
+	UFUNCTION(NetMulticast, Reliable, WithValidation)
+	void Multi_TryMelee();
+	bool Multi_TryMelee_Validate();
+	void Multi_TryMelee_Implementation();
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_TryMelee();
+	bool Server_TryMelee_Validate();
+	void Server_TryMelee_Implementation();
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
 	UTP_WeaponComponent* M_CurrentWeapon = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
+	AWeapon_Melee* M_MeleeWeapon = nullptr;
+	
 protected:
 	// APawn interface
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;

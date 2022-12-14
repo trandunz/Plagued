@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Components/TimelineComponent.h"
+#include "Components/BoxComponent.h"
 #include "Door_Base.generated.h"
 
 UCLASS()
@@ -37,6 +38,9 @@ private:
 	UStaticMeshComponent* Door;
 	UPROPERTY(VisibleAnywhere, Category = "Mesh")
 	UStaticMeshComponent* Handle;
+	
+	UPROPERTY(EditAnywhere, Category = "Collision")
+    UBoxComponent* Collider;
 
 	FTimeline Timeline;
 	UPROPERTY(EditAnywhere)
