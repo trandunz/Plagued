@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "IInteractInterface.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -35,12 +36,9 @@ class APlaguedCharacter : public ACharacter
 	
 	UPROPERTY()
 	class UCW_HUD* PlayerHUD;
-
-	UPROPERTY()
-	class UCW_Inventory* PlayerInventory;
 	
 	/** MappingContext */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=In1put, meta=(AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
 	class UInputMappingContext* DefaultMappingContext;
 
 	/** Jump Input Action */
@@ -72,6 +70,9 @@ class APlaguedCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
 	class UInputAction* Aim;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
+	class UInputAction* Sprint;
+
 public:
 	APlaguedCharacter();
 
@@ -88,12 +89,27 @@ public:
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadWrite);
 	bool CanMeleeAttack = false;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadWrite);
+	float MovementSpeed = 500.0f;
 	
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<class UCW_HUD> PlayerHUDClass;
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<class UCW_Inventory> PlayerInventoryClass;
+	
+	UPROPERTY()
+	class UCW_Inventory* PlayerInventory;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Inventory", meta=(AllowPrivateAccess = "true"))
+	class UAC_InventorySystem* InventorySystem;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite);
+	float SprintSpeed = 900.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite);
+	float WalkSpeed = 500.0f;
 
 protected:
 	virtual void BeginPlay();
@@ -115,6 +131,9 @@ protected:
 	void EndAim();
 
 	void TryMelee();
+
+	void StartSprint();
+	void EndSprint();
 
 	FHitResult* LastRaycastHit = nullptr;
 public:
@@ -145,13 +164,16 @@ public:
 	void FireWeapon();
 
 	UFUNCTION(BlueprintCallable)
-	void PickupItem(APickup_Base* _pickup);
+	void TryInteractWithInterface(AActor* _pickup);
 
 	UFUNCTION(BlueprintCallable)
 	void OpenDoor(ADoor_Base* _door);
 
 	UFUNCTION(BlueprintCallable)
-	void ToggleWeapon(TSubclassOf<class AWeapon_Melee> _weaponClass = nullptr);
+	void ToggleWeapon(AWeapon_Melee* _weaponClass = nullptr);
+
+	UFUNCTION(BlueprintCallable)
+	void EquipItem(TSubclassOf<AActor> _class);
 protected:
 	/** Called for movement input */
 	void Move(const FInputActionValue& Value);
@@ -177,9 +199,9 @@ protected:
 	void Server_FireWeapon_Implementation();
 
 	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_PickupItem(APickup_Base* _pickup);
-	bool Server_PickupItem_Validate(APickup_Base* _pickup);
-	void Server_PickupItem_Implementation(APickup_Base* _pickup);
+	void Server_Interact(AActor* _pickup);
+	bool Server_Interact_Validate(AActor* _pickup);
+	void Server_Interact_Implementation(AActor* _pickup);
 
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_OpenDoor(ADoor_Base* _door);
@@ -196,11 +218,29 @@ protected:
 	bool Server_TryMelee_Validate();
 	void Server_TryMelee_Implementation();
 
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_EquipItem(TSubclassOf<AActor> _class);
+	bool Server_EquipItem_Validate(TSubclassOf<AActor> _class);
+	void Server_EquipItem_Implementation(TSubclassOf<AActor> _class);
+	
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_StartSprint();
+	bool Server_StartSprint_Validate();
+	void Server_StartSprint_Implementation();
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_EndSprint();
+	bool Server_EndSprint_Validate();
+	void Server_EndSprint_Implementation();
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
 	UTP_WeaponComponent* M_CurrentWeapon = nullptr;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
 	AWeapon_Melee* M_MeleeWeapon = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly);
+	AActor* M_EquipedItem = nullptr;
 	
 protected:
 	// APawn interface

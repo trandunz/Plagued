@@ -19,12 +19,6 @@ APickup_Base::APickup_Base()
 	
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
 	Mesh->AttachToComponent(Root, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
-	
-	Collider = CreateDefaultSubobject<UBoxComponent>(TEXT("Collider"));
-	Collider->SetWorldScale3D({1.0f, 1.0f, 1.0f});
-	Collider->SetGenerateOverlapEvents(true);
-	Collider->OnComponentBeginOverlap.AddDynamic(this, &APickup_Base::APickup_Base::OnPlayerEnterCollider);
-	Collider->AttachToComponent(Root, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 }
 
 // Called when the game starts or when spawned
@@ -43,8 +37,3 @@ void APickup_Base::Pickup(APlaguedCharacter* _character)
 {
 	Destroy();
 }
-
-void APickup_Base::OnPlayerEnterCollider(UPrimitiveComponent* _overlapComp, AActor* _otherActor, UPrimitiveComponent* _otherComp, int32 _otherBodyIndex, bool _fromSweep, const FHitResult& _sweepResult)
-{
-}
-

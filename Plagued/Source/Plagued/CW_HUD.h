@@ -18,6 +18,7 @@ class PLAGUED_API UCW_HUD : public UUserWidget
 public:
 	void SetSlot(UTexture2D* _texture, int32 _index);
 	void ShowInteractText(bool _show);
+	void ShowInteractText(bool _show, FString _message);
 
 	UPROPERTY(EditAnywhere, meta = (BindWidget))
 	class UImage* Slot_Item;

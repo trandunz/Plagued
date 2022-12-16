@@ -64,3 +64,16 @@ void UCW_HUD::ShowInteractText(bool _show)
 		InteractText->SetVisibility(ESlateVisibility::Hidden);
 	}
 }
+
+void UCW_HUD::ShowInteractText(bool _show, FString _message)
+{
+	InteractText->SetText(FText::FromString(_message));
+	if (_show)
+	{
+		InteractText->SetVisibility(ESlateVisibility::Visible);
+	}
+	else
+	{
+		InteractText->SetVisibility(ESlateVisibility::Hidden);
+	}
+}

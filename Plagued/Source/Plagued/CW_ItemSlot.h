@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AC_InventorySystem.h"
 #include "Blueprint/UserWidget.h"
 #include "CW_ItemSlot.generated.h"
 
@@ -13,5 +14,27 @@ UCLASS()
 class PLAGUED_API UCW_ItemSlot : public UUserWidget
 {
 	GENERATED_BODY()
+
+public:
+	void NativePreConstruct() override;
+
+	UFUNCTION(BlueprintCallable)
+	void EquipItem();
 	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UDataTable* ItemData;
+	
+	UPROPERTY(EditAnywhere, meta = (BindWidget))
+	class UImage* Thumbnail;
+
+	UPROPERTY(EditAnywhere, meta = (BindWidget))
+	class UTextBlock* QuantityText;
+
+	UPROPERTY(EditAnywhere, meta = (BindWidget))
+	class USizeBox* QuantityBox;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FName ItemID;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Quantity;
 };

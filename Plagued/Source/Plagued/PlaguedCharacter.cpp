@@ -14,7 +14,11 @@
 #include "Weapon_Melee.h"
 #include "Door_Base.h"
 #include "TP_WeaponComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/GameSession.h"
+#include "IInteractInterface.h"
+#include "AC_InventorySystem.h"
+#include "ItemData.h"
 #include "Net/UnrealNetwork.h"
 
 
@@ -45,6 +49,10 @@ APlaguedCharacter::APlaguedCharacter()
 	FAttachmentTransformRules AttachmentRules(EAttachmentRule::KeepRelative, false);
 	MeleeWeaponSocket->AttachToComponent(GetMesh(), AttachmentRules, FName("RightHandIndex1"));
 
+	GetCharacterMovement()->SetIsReplicated(true);
+
+	InventorySystem = CreateDefaultSubobject<UAC_InventorySystem>(TEXT("Inventory_System"));
+
 	// Init Arm Lag
 	//Arm->bEnableCameraLag = true;
 	//Arm->CameraLagSpeed = 2.0f;
@@ -61,6 +69,7 @@ void APlaguedCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	DOREPLIFETIME(APlaguedCharacter, IsMeleeStance);
 	DOREPLIFETIME(APlaguedCharacter, TryMeleeAttack);
 	DOREPLIFETIME(APlaguedCharacter, CanMeleeAttack);
+	DOREPLIFETIME(APlaguedCharacter, MovementSpeed);
 }
 
 void APlaguedCharacter::BeginPlay()
@@ -78,8 +87,6 @@ void APlaguedCharacter::BeginPlay()
 	}
 
 	ToggleHUD();
-
-	ToggleWeapon();
 }
 
 void APlaguedCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -110,7 +117,7 @@ void APlaguedCharacter::OnConstruction(const FTransform& Transform)
 void APlaguedCharacter::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	
+
 	if (M_IsZooming)
 	{
 		GetFirstPersonCameraComponent()->SetFieldOfView(FMath::Lerp(GetFirstPersonCameraComponent()->FieldOfView, 40.0f, DeltaSeconds * 10.0f));
@@ -121,6 +128,8 @@ void APlaguedCharacter::Tick(const float DeltaSeconds)
 	}
 
 	InteractRaycast();
+
+	GetCharacterMovement()->MaxWalkSpeed = FMath::Lerp(GetCharacterMovement()->MaxWalkSpeed, MovementSpeed, DeltaSeconds * 10.0f);
  }
 
 void APlaguedCharacter::AttachCameraToTPP()
@@ -162,10 +171,10 @@ void APlaguedCharacter::InteractRaycast()
 	
 	if (GetWorld()->LineTraceSingleByChannel(*result, startTrace, endTrace, ECC_Visibility, *queryParams))
 	{
-		if (APickup_Base* pickup = Cast<APickup_Base>(result->GetActor()))
+		if (IIInteractInterface* Pickup = Cast<IIInteractInterface>(result->GetActor()))
 		{
 			if (PlayerHUD)
-				PlayerHUD->ShowInteractText(true);
+				PlayerHUD->ShowInteractText(true, Pickup->LookAt());
 		}
 		if (ADoor_Base* door = Cast<ADoor_Base>(result->GetActor()))
 		{
@@ -181,9 +190,9 @@ void APlaguedCharacter::TryInteract()
 {
 	if (LastRaycastHit)
 	{
-		if (APickup_Base* pickup = Cast<APickup_Base>(LastRaycastHit->GetActor()))
+		if (IIInteractInterface* Pickup = Cast<IIInteractInterface>(LastRaycastHit->GetActor()))
 		{
-			PickupItem(pickup);
+			TryInteractWithInterface(LastRaycastHit->GetActor());
 		}
 		if (ADoor_Base* door = Cast<ADoor_Base>(LastRaycastHit->GetActor()))
 		{
@@ -201,6 +210,9 @@ void APlaguedCharacter::ToggleInventoryMenu()
 			PlayerInventory->RemoveFromParent();
 			PlayerInventory = nullptr;
 
+			APlayerController* controller = GetController<APlayerController>();
+			controller->SetShowMouseCursor(false);
+			
 			ToggleHUD();
 		}
 		else
@@ -251,6 +263,30 @@ void APlaguedCharacter::TryMelee()
 	Multi_TryMelee();
 }
 
+void APlaguedCharacter::StartSprint()
+{
+	if (!HasAuthority())
+	{
+		Server_StartSprint();
+	}
+	else
+	{
+		MovementSpeed = SprintSpeed;
+	}
+}
+
+void APlaguedCharacter::EndSprint()
+{
+	if (!HasAuthority())
+	{
+		Server_EndSprint();
+	}
+	else
+	{
+		MovementSpeed = WalkSpeed;
+	}
+}
+
 void APlaguedCharacter::Jump()
 {
 	Super::Jump();
@@ -293,6 +329,9 @@ void APlaguedCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 
 		EnhancedInputComponent->BindAction(Aim, ETriggerEvent::Triggered, this, &APlaguedCharacter::StartAim);
 		EnhancedInputComponent->BindAction(Aim, ETriggerEvent::Completed, this, &APlaguedCharacter::EndAim);
+
+		EnhancedInputComponent->BindAction(Sprint, ETriggerEvent::Triggered, this, &APlaguedCharacter::StartSprint);
+		EnhancedInputComponent->BindAction(Sprint, ETriggerEvent::Completed, this, &APlaguedCharacter::EndSprint);
 	}
 }
 
@@ -384,17 +423,20 @@ void APlaguedCharacter::FireWeapon()
 	}
 }
 
-void APlaguedCharacter::PickupItem(APickup_Base* _pickup)
+void APlaguedCharacter::TryInteractWithInterface(AActor* _pickup)
 {
-	GetHUD()->SetSlot(_pickup->Icon, 0);
-	
 	if (!HasAuthority())
 	{
-		Server_PickupItem(_pickup);
+		Server_Interact(_pickup);
 	}
 	else
 	{
-		_pickup->Pickup(this);
+		if (UItemData* itemdata = _pickup->FindComponentByClass<UItemData>())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Item Added"));
+			InventorySystem->AddToInventory(itemdata);
+		}
+		Cast<IIInteractInterface>(_pickup)->Interact();
 	}
 }
 
@@ -410,17 +452,36 @@ void APlaguedCharacter::OpenDoor(ADoor_Base* _door)
 	}
 }
 
-void APlaguedCharacter::ToggleWeapon(TSubclassOf<class AWeapon_Melee> _weaponClass)
+void APlaguedCharacter::ToggleWeapon(AWeapon_Melee* _weapon)
 {
-	if (M_MeleeWeapon != nullptr)
+	M_MeleeWeapon = _weapon;
+	FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
+	M_MeleeWeapon->AttachToComponent(MeleeWeaponSocket, AttachmentRules);
+}
+
+void APlaguedCharacter::EquipItem(TSubclassOf<AActor> _class)
+{
+	UE_LOG(LogTemp, Warning, TEXT("Try Equip Item"));
+
+	if (!HasAuthority())
 	{
-		M_MeleeWeapon->Destroy();
+		Server_EquipItem(_class);
 	}
-	else if (MeleeAsset != nullptr)
+	else
 	{
-		M_MeleeWeapon = GetWorld()->SpawnActor<AWeapon_Melee>(MeleeAsset);
+		if (M_EquipedItem)
+		{
+			M_EquipedItem->GetOwner()->Destroy();
+		}
+	
+		M_EquipedItem = GetWorld()->SpawnActor<AActor>(_class);
 		FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
-		M_MeleeWeapon->AttachToComponent(MeleeWeaponSocket, AttachmentRules);
+		M_EquipedItem->AttachToActor(GetOwner(), AttachmentRules);
+	
+		if (AWeapon_Melee* meleeWeapon = Cast<AWeapon_Melee>(M_EquipedItem))
+		{
+			ToggleWeapon(meleeWeapon);
+		}
 	}
 }
 
@@ -437,14 +498,18 @@ void APlaguedCharacter::Server_FireWeapon_Implementation()
 	}
 }
 
-bool APlaguedCharacter::Server_PickupItem_Validate(APickup_Base* _pickup)
+bool APlaguedCharacter::Server_Interact_Validate(AActor* _pickup)
 {
 	return true;
 }
 
-void APlaguedCharacter::Server_PickupItem_Implementation(APickup_Base* _pickup)
+void APlaguedCharacter::Server_Interact_Implementation(AActor* _pickup)
 {
-	_pickup->Pickup(this);
+	if (UItemData* itemdata = _pickup->FindComponentByClass<UItemData>())
+	{
+		InventorySystem->AddToInventory(itemdata);
+	}
+	Cast<IIInteractInterface>(_pickup)->Interact();
 }
 
 bool APlaguedCharacter::Server_OpenDoor_Validate(ADoor_Base* _door)
@@ -483,4 +548,46 @@ void APlaguedCharacter::Server_TryMelee_Implementation()
 		CanMeleeAttack = false;
 		TryMeleeAttack = true;
 	}
+}
+
+bool APlaguedCharacter::Server_EquipItem_Validate(TSubclassOf<AActor> _class)
+{
+	return true;
+}
+
+void APlaguedCharacter::Server_EquipItem_Implementation(TSubclassOf<AActor> _class)
+{
+	if (M_EquipedItem)
+	{
+		M_EquipedItem->GetOwner()->Destroy();
+	}
+	
+	M_EquipedItem = GetWorld()->SpawnActor<AActor>(_class);
+	FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
+	M_EquipedItem->AttachToActor(GetOwner(), AttachmentRules);
+	
+	if (AWeapon_Melee* meleeWeapon = Cast<AWeapon_Melee>(M_EquipedItem))
+	{
+		ToggleWeapon(meleeWeapon);
+	}
+}
+
+bool APlaguedCharacter::Server_StartSprint_Validate()
+{
+	return true;
+}
+
+void APlaguedCharacter::Server_StartSprint_Implementation()
+{
+	MovementSpeed = SprintSpeed;
+}
+
+bool APlaguedCharacter::Server_EndSprint_Validate()
+{
+	return true;
+}
+
+void APlaguedCharacter::Server_EndSprint_Implementation()
+{
+	MovementSpeed = WalkSpeed;
 }

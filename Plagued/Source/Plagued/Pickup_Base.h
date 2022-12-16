@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "IInteractInterface.h"
 #include "GameFramework/Actor.h"
 #include "Pickup_Base.generated.h"
 
@@ -30,15 +31,8 @@ public:
 	UStaticMeshComponent* Mesh;
 
 	UPROPERTY(EditAnywhere)
-	UShapeComponent* Collider;
-
-	UPROPERTY(EditAnywhere)
 	UTexture2D* Icon;
 
 	UFUNCTION()
 	void Pickup(APlaguedCharacter* _character);
-	
-	UFUNCTION()
-	void OnPlayerEnterCollider(UPrimitiveComponent* _overlapComp, AActor* _otherActor, UPrimitiveComponent* _otherComp, int32 _otherBodyIndex, bool _fromSweep, const FHitResult& _sweepResult);
-
 };
