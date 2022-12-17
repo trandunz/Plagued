@@ -49,6 +49,9 @@ APlaguedCharacter::APlaguedCharacter()
 	FAttachmentTransformRules AttachmentRules(EAttachmentRule::KeepRelative, false);
 	MeleeWeaponSocket->AttachToComponent(GetMesh(), AttachmentRules, FName("RightHandIndex1"));
 
+	HandGunSocket = CreateDefaultSubobject<USceneComponent>(TEXT("Hand_Gun_Socket"));
+	HandGunSocket->AttachToComponent(GetMesh(), AttachmentRules, FName("RightHandIndex1"));
+
 	GetCharacterMovement()->SetIsReplicated(true);
 
 	InventorySystem = CreateDefaultSubobject<UAC_InventorySystem>(TEXT("Inventory_System"));
@@ -70,6 +73,7 @@ void APlaguedCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	DOREPLIFETIME(APlaguedCharacter, TryMeleeAttack);
 	DOREPLIFETIME(APlaguedCharacter, CanMeleeAttack);
 	DOREPLIFETIME(APlaguedCharacter, MovementSpeed);
+	DOREPLIFETIME(APlaguedCharacter, IsAiming);
 }
 
 void APlaguedCharacter::BeginPlay()
@@ -250,12 +254,14 @@ void APlaguedCharacter::ToggleHUD()
 
 void APlaguedCharacter::StartAim()
 {
-	IsMeleeStance = true;
+	//IsMeleeStance = true;
+	IsAiming = true;
 }
 
 void APlaguedCharacter::EndAim()
 {
-	IsMeleeStance = false;
+	//IsMeleeStance = false;
+	IsAiming = false;
 }
 
 void APlaguedCharacter::TryMelee()
@@ -316,7 +322,7 @@ void APlaguedCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 
 		EnhancedInputComponent->BindAction(TestAction, ETriggerEvent::Triggered, this, &APlaguedCharacter::Test);
 
-		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &APlaguedCharacter::TryMelee);
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &APlaguedCharacter::FireWeapon);
 
 		EnhancedInputComponent->BindAction(ZoomAction, ETriggerEvent::Triggered, this, &APlaguedCharacter::Zoom);
 		EnhancedInputComponent->BindAction(ZoomAction, ETriggerEvent::Completed, this, &APlaguedCharacter::StopZoom);
@@ -417,9 +423,12 @@ void APlaguedCharacter::FireWeapon()
 	{
 		Server_FireWeapon();
 	}
-	else if (M_CurrentWeapon != nullptr)
+	else
 	{
-		M_CurrentWeapon->Fire();
+		if (M_EquipedItem != nullptr)
+		{
+			Cast<IIGunInterface>(M_EquipedItem)->Fire();
+		}
 	}
 }
 
@@ -452,11 +461,21 @@ void APlaguedCharacter::OpenDoor(ADoor_Base* _door)
 	}
 }
 
-void APlaguedCharacter::ToggleWeapon(AWeapon_Melee* _weapon)
+void APlaguedCharacter::ToggleWeapon(AActor* _weapon)
 {
-	M_MeleeWeapon = _weapon;
-	FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
-	M_MeleeWeapon->AttachToComponent(MeleeWeaponSocket, AttachmentRules);
+	if (AWeapon_Melee* meleeWeapon = Cast<AWeapon_Melee>(_weapon))
+	{
+		M_MeleeWeapon = meleeWeapon;
+		FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
+		M_MeleeWeapon->AttachToComponent(MeleeWeaponSocket, AttachmentRules);
+	}
+	else if (IIGunInterface* gun = Cast<IIGunInterface>(_weapon))
+	{
+		EquipedWeapon = _weapon;
+		gun->InstigatorController = Cast<APlayerController>(GetController());
+		FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
+		EquipedWeapon->AttachToComponent(HandGunSocket, AttachmentRules);
+	}
 }
 
 void APlaguedCharacter::EquipItem(TSubclassOf<AActor> _class)
@@ -476,12 +495,9 @@ void APlaguedCharacter::EquipItem(TSubclassOf<AActor> _class)
 	
 		M_EquipedItem = GetWorld()->SpawnActor<AActor>(_class);
 		FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
-		M_EquipedItem->AttachToActor(GetOwner(), AttachmentRules);
-	
-		if (AWeapon_Melee* meleeWeapon = Cast<AWeapon_Melee>(M_EquipedItem))
-		{
-			ToggleWeapon(meleeWeapon);
-		}
+		M_EquipedItem->AttachToComponent(RootComponent, AttachmentRules);
+
+		ToggleWeapon(M_EquipedItem);
 	}
 }
 
@@ -492,9 +508,9 @@ bool APlaguedCharacter::Server_FireWeapon_Validate()
 
 void APlaguedCharacter::Server_FireWeapon_Implementation()
 {
-	if (M_CurrentWeapon != nullptr)
+	if (M_EquipedItem != nullptr)
 	{
-		M_CurrentWeapon->Fire();
+		Cast<IIGunInterface>(M_EquipedItem)->Fire();
 	}
 }
 
@@ -564,12 +580,9 @@ void APlaguedCharacter::Server_EquipItem_Implementation(TSubclassOf<AActor> _cla
 	
 	M_EquipedItem = GetWorld()->SpawnActor<AActor>(_class);
 	FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
-	M_EquipedItem->AttachToActor(GetOwner(), AttachmentRules);
+	M_EquipedItem->AttachToComponent(RootComponent, AttachmentRules);
 	
-	if (AWeapon_Melee* meleeWeapon = Cast<AWeapon_Melee>(M_EquipedItem))
-	{
-		ToggleWeapon(meleeWeapon);
-	}
+	ToggleWeapon(M_EquipedItem);
 }
 
 bool APlaguedCharacter::Server_StartSprint_Validate()

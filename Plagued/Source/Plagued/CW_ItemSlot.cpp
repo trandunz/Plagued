@@ -43,12 +43,15 @@ void UCW_ItemSlot::EquipItem()
 	{
 		if (FItemStruct* item = ItemData->FindRow<FItemStruct>(ItemID, nullptr))
 		{
-			if (APlayerController* controller = GetOwningPlayer<APlayerController>())
+			if (item->ItemClass)
 			{
-				if (APlaguedCharacter* character = Cast<APlaguedCharacter>(controller->GetCharacter()))
+				if (APlayerController* controller = GetOwningPlayer<APlayerController>())
 				{
-					UE_LOG(LogTemp, Warning, TEXT("Equip Item From Inventory"));
-					character->EquipItem(item->ItemClass);
+					if (APlaguedCharacter* character = Cast<APlaguedCharacter>(controller->GetCharacter()))
+					{
+						UE_LOG(LogTemp, Warning, TEXT("Equip Item From Inventory"));
+						character->EquipItem(item->ItemClass);
+					}
 				}
 			}
 		}

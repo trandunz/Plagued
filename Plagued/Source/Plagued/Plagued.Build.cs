@@ -9,5 +9,11 @@ public class Plagued : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "HeadMountedDisplay", "EnhancedInput", "UMG" });
+		
+		PrivateDependencyModuleNames.AddRange(new string[] { "AIModule", "NavigationSystem"});
+		
+		PublicDependencyModuleNames.AddRange(new string[] { "GameplayAbilities", "GameplayTags", "GameplayTasks"});
+		
+		PrivateDependencyModuleNames.Add("OnlineSubsystem");
 	}
 }

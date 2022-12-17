@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "IGunInterface.h"
 #include "IInteractInterface.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
@@ -27,6 +28,9 @@ class APlaguedCharacter : public ACharacter
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=MyCharacter, meta=(AllowPrivateAccess = "true"))
 	USceneComponent* MeleeWeaponSocket;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=MyCharacter, meta=(AllowPrivateAccess = "true"))
+	USceneComponent* HandGunSocket;
 	
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<class AWeapon_Melee> MeleeAsset;
@@ -89,6 +93,9 @@ public:
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadWrite);
 	bool CanMeleeAttack = false;
+
+	UPROPERTY(Replicated, EditAnywhere, BlueprintReadOnly);
+	bool IsAiming = false;
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadWrite);
 	float MovementSpeed = 500.0f;
@@ -168,9 +175,9 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void OpenDoor(ADoor_Base* _door);
-
+	
 	UFUNCTION(BlueprintCallable)
-	void ToggleWeapon(AWeapon_Melee* _weaponClass = nullptr);
+	void ToggleWeapon(AActor* _weapon = nullptr);
 
 	UFUNCTION(BlueprintCallable)
 	void EquipItem(TSubclassOf<AActor> _class);
@@ -238,6 +245,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
 	AWeapon_Melee* M_MeleeWeapon = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
+	AActor* EquipedWeapon = nullptr;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly);
 	AActor* M_EquipedItem = nullptr;
