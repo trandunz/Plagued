@@ -18,7 +18,9 @@
 #include "GameFramework/GameSession.h"
 #include "IInteractInterface.h"
 #include "AC_InventorySystem.h"
+#include "AM1911.h"
 #include "ItemData.h"
+#include "Components/SplineMeshComponent.h"
 #include "Net/UnrealNetwork.h"
 
 
@@ -32,6 +34,8 @@ APlaguedCharacter::APlaguedCharacter()
 	
 	// Character doesnt have a rifle at start
 	bHasRifle = false;
+
+	FAttachmentTransformRules AttachmentRules(EAttachmentRule::KeepRelative, false);
 	
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(55.f, 96.0f);
@@ -42,11 +46,13 @@ APlaguedCharacter::APlaguedCharacter()
 
 	// Create Arm
 	Arm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
-	Arm->TargetArmLength = 300.0f;
+	Arm->TargetArmLength = 150.0f;
 	Arm->SetRelativeRotation(FRotator(-45.0f, 0.0f, 0.0f));
+	Arm->AttachToComponent(GetMesh(), AttachmentRules, FName("Head"));
+	Arm->SocketOffset = {0,70,-20};
 
 	MeleeWeaponSocket = CreateDefaultSubobject<USceneComponent>(TEXT("Melee_Weapon_Socket"));
-	FAttachmentTransformRules AttachmentRules(EAttachmentRule::KeepRelative, false);
+	
 	MeleeWeaponSocket->AttachToComponent(GetMesh(), AttachmentRules, FName("RightHandIndex1"));
 
 	HandGunSocket = CreateDefaultSubobject<USceneComponent>(TEXT("Hand_Gun_Socket"));
@@ -55,6 +61,9 @@ APlaguedCharacter::APlaguedCharacter()
 	GetCharacterMovement()->SetIsReplicated(true);
 
 	InventorySystem = CreateDefaultSubobject<UAC_InventorySystem>(TEXT("Inventory_System"));
+
+	RHand_IK_Component = CreateDefaultSubobject<USceneComponent>(TEXT("RHand_IK_Component"));
+	RHand_IK_Component->SetupAttachment(FirstPersonCameraComponent);
 
 	// Init Arm Lag
 	//Arm->bEnableCameraLag = true;
@@ -91,6 +100,16 @@ void APlaguedCharacter::BeginPlay()
 	}
 
 	ToggleHUD();
+
+	if (AimCurveFloat)
+	{
+		FOnTimelineFloat timelineProgress;
+		timelineProgress.BindDynamic(this, &APlaguedCharacter::SetRHandAimAlpha);
+		AimTimeline.AddInterpFloat(AimCurveFloat, timelineProgress);
+	}
+
+	RHandDefaultTransform = RHand_IK_Component->GetRelativeTransform();
+	AimTimeline.SetPlayRate(4.0f);
 }
 
 void APlaguedCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -121,6 +140,8 @@ void APlaguedCharacter::OnConstruction(const FTransform& Transform)
 void APlaguedCharacter::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+
+	AimTimeline.TickTimeline(DeltaSeconds);
 
 	if (M_IsZooming)
 	{
@@ -256,12 +277,30 @@ void APlaguedCharacter::StartAim()
 {
 	//IsMeleeStance = true;
 	IsAiming = true;
+
+	AimTimeline.Play();
+
+	if (RHand_IK_Component && M_EquipedItem)
+	{
+		if (USkeletalMeshComponent* itemMesh = M_EquipedItem->FindComponentByClass<class USkeletalMeshComponent>())
+		{
+			FTransform relative = itemMesh->GetSocketTransform(FName("RightHand")).GetRelativeTransform(GetMesh()->GetSocketTransform(FName("S_AimPoint")));
+			FVector difference {(RHand_IK_Component->GetRelativeLocation().X - relative.GetLocation().X),
+				(RHand_IK_Component->GetRelativeLocation().Y - (-relative.GetLocation().Y)),
+				(RHand_IK_Component->GetRelativeLocation().Z - relative.GetLocation().Z)
+			};
+			RHand_IK_Component->SetRelativeLocation(difference);
+			RHand_IK_Component->SetRelativeRotation(relative.GetRotation());
+		}
+	}
 }
 
 void APlaguedCharacter::EndAim()
 {
 	//IsMeleeStance = false;
 	IsAiming = false;
+
+	AimTimeline.Reverse();
 }
 
 void APlaguedCharacter::TryMelee()
@@ -365,6 +404,9 @@ void APlaguedCharacter::Look(const FInputActionValue& Value)
 		// add yaw and pitch input to controller
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
+		
+		SpineRotationX = {GetControlRotation().Pitch * -1, 0, 0};
+		Server_SpineRotation(GetControlRotation().Pitch * -1);
 	}
 }
 
@@ -386,6 +428,26 @@ bool APlaguedCharacter::Server_Test_Validate()
 void APlaguedCharacter::Server_Test_Implementation()
 {
 	UE_LOG(LogTemp, Warning, TEXT("TestRPC"));
+}
+
+bool APlaguedCharacter::Server_SpineRotation_Validate(float _xRotation)
+{
+	return true;
+}
+
+void APlaguedCharacter::Server_SpineRotation_Implementation(float _xRotation)
+{
+	Multi_SpineRotation(_xRotation);
+}
+
+bool APlaguedCharacter::Multi_SpineRotation_Validate(float _xRotation)
+{
+	return true;
+}
+
+void APlaguedCharacter::Multi_SpineRotation_Implementation(float _xRotation)
+{
+	SpineRotationX = {0, 0 ,_xRotation};
 }
 
 void APlaguedCharacter::SetHasRifle(bool bNewHasRifle)
@@ -603,4 +665,15 @@ bool APlaguedCharacter::Server_EndSprint_Validate()
 void APlaguedCharacter::Server_EndSprint_Implementation()
 {
 	MovementSpeed = WalkSpeed;
+}
+
+void APlaguedCharacter::SetRHandAimAlpha(float _alpha)
+{
+	RHandAimAlpha = _alpha;
+	UE_LOG(LogTemp, Warning, TEXT("Aim Timeline Value: %f"), RHandAimAlpha);
+
+	if (!IsAiming && _alpha >= 1)
+	{
+		RHand_IK_Component->SetRelativeTransform(RHandDefaultTransform);
+	}
 }

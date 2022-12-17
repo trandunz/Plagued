@@ -7,6 +7,7 @@
 #include "IInteractInterface.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
+#include "Components/TimelineComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "PlaguedCharacter.generated.h"
 
@@ -195,10 +196,23 @@ protected:
 	float M_ZoomRatio = 0.0f;
 	bool M_IsFirstPerson = true;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FRotator SpineRotationX;
+
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_Test();
 	bool Server_Test_Validate();
 	void Server_Test_Implementation();
+	
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_SpineRotation(float _xRotation);
+	bool Server_SpineRotation_Validate(float _xRotation);
+	void Server_SpineRotation_Implementation(float _xRotation);
+
+	UFUNCTION(NetMulticast, Reliable, WithValidation)
+	void Multi_SpineRotation(float _xRotation);
+	bool Multi_SpineRotation_Validate(float _xRotation);
+	void Multi_SpineRotation_Implementation(float _xRotation);
 
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_FireWeapon();
@@ -240,6 +254,9 @@ protected:
 	bool Server_EndSprint_Validate();
 	void Server_EndSprint_Implementation();
 
+	UFUNCTION()
+	void SetRHandAimAlpha(float _alpha);
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
 	UTP_WeaponComponent* M_CurrentWeapon = nullptr;
 
@@ -251,6 +268,18 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly);
 	AActor* M_EquipedItem = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite);
+	USceneComponent* RHand_IK_Component = nullptr;
+
+	FTransform RHandDefaultTransform;
+	
+	FTimeline AimTimeline;
+	UPROPERTY(EditAnywhere)
+	UCurveFloat* AimCurveFloat;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float RHandAimAlpha;
 	
 protected:
 	// APawn interface
