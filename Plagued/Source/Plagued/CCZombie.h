@@ -14,13 +14,52 @@ class PLAGUED_API ACCZombie : public ACharacter
 	GENERATED_BODY()
 
 public:
-	// Sets default values for this character's properties
 	ACCZombie();
 
 protected:
-	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
+public:	
+	virtual void Tick(float DeltaTime) override;
+	
+	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
+	virtual void PostInitializeComponents() override;
+
+	UFUNCTION(BlueprintCallable)
+	void Attack();
+
+	UFUNCTION()
+	void OnHearNoise(APawn *OtherActor, const FVector &Location, float Volume);
+
+	UFUNCTION()
+	void OnSeePawn(APawn *OtherPawn);
+
+	UFUNCTION(BlueprintCallable)
+	void TakeDamage(float _amount);
+
+	UFUNCTION()
+	virtual void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
+
+	UFUNCTION()
+	void OnDeath();
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	class USphereComponent* HeadCollider;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPawnSensingComponent* PawnSensing;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UAnimMontage* AttackMontage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float CurrentHealth;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MaxHealth;
+
+protected:
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_Attack();
 	bool Server_Attack_Validate();
@@ -31,28 +70,8 @@ protected:
 	bool Multi_Attack_Validate();
 	void Multi_Attack_Implementation();
 
-public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-
-	// Called to bind functionality to input
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-
-	virtual void PostInitializeComponents() override;
-
-	UFUNCTION(BlueprintCallable)
-	void Attack();
-	
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UPawnSensingComponent* PawnSensing;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UAnimMontage* AttackMontage;
-
-	UFUNCTION()
-	void OnHearNoise(APawn *OtherActor, const FVector &Location, float Volume);
-
-	UFUNCTION()
-	void OnSeePawn(APawn *OtherPawn);
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_TakeDamage(float _amount);
+	bool Server_TakeDamage_Validate(float _amount);
+	void Server_TakeDamage_Implementation(float _amount);
 };

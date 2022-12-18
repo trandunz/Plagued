@@ -44,7 +44,10 @@ void AAM1911::Multi_Attack_Implementation()
 {
 	if (ShootMontage)
 	{
-		Mesh->GetAnimInstance()->Montage_Play(ShootMontage);
+		if (Mesh->GetAnimInstance())
+		{
+			Mesh->GetAnimInstance()->Montage_Play(ShootMontage);
+		}
 	}
 }
 

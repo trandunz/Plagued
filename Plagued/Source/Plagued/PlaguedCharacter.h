@@ -23,25 +23,6 @@ class APlaguedCharacter : public ACharacter
 {
 	GENERATED_BODY()
 	
-	/** First person camera */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=MyCharacter, meta=(AllowPrivateAccess = "true"))
-	UCameraComponent* FirstPersonCameraComponent;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=MyCharacter, meta=(AllowPrivateAccess = "true"))
-	USceneComponent* MeleeWeaponSocket;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=MyCharacter, meta=(AllowPrivateAccess = "true"))
-	USceneComponent* HandGunSocket;
-	
-	UPROPERTY(EditAnywhere)
-	TSubclassOf<class AWeapon_Melee> MeleeAsset;
-	
-	UPROPERTY()
-	USpringArmComponent* Arm;
-	
-	UPROPERTY()
-	class UCW_HUD* PlayerHUD;
-	
 	/** MappingContext */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
 	class UInputMappingContext* DefaultMappingContext;
@@ -78,13 +59,13 @@ class APlaguedCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
 	class UInputAction* Sprint;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
+	class UInputAction* Reload;
+
 public:
 	APlaguedCharacter();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-	
-	void Jump();
-	void StopJumping();
 	
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly);
 	bool IsMeleeStance = false;
@@ -97,6 +78,9 @@ public:
 
 	UPROPERTY(Replicated, EditAnywhere, BlueprintReadOnly);
 	bool IsAiming = false;
+
+	UPROPERTY(Replicated, EditAnywhere, BlueprintReadOnly);
+	bool RifleEquiped = false;
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadWrite);
 	float MovementSpeed = 500.0f;
@@ -118,13 +102,22 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite);
 	float WalkSpeed = 500.0f;
+	
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly);
+	AActor* EquipedItem;
 
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly)
+	FRotator SpineRotationX;
 protected:
 	virtual void BeginPlay();
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
 
+	void Move(const FInputActionValue& Value);
+	void Look(const FInputActionValue& Value);
+	
 	void AttachCameraToTPP();
 	void AttachCameraToFPP();
 	void ChangePerspective();
@@ -143,27 +136,31 @@ protected:
 	void StartSprint();
 	void EndSprint();
 
+	void Zoom();
+	void StopZoom();
+
+	void TryReloadGun();
+
 	FHitResult* LastRaycastHit = nullptr;
-public:
-		
-	/** Look Input Action */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	class UInputAction* LookAction;
 
-	/** Bool for AnimBP to switch to another animation set */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
-	bool bHasRifle;
-
-	/** Setter to set the bool */
-	UFUNCTION(BlueprintCallable, Category = Weapon)
-	void SetHasRifle(bool bNewHasRifle);
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=MyCharacter, meta=(AllowPrivateAccess = "true"))
+	UCameraComponent* FirstPersonCameraComponent;
 	
-	UFUNCTION(BlueprintCallable, Category = Weapon)
-	void SetRifle(UTP_WeaponComponent* _rifle);
+	UPROPERTY()
+	USpringArmComponent* Arm;
+	
+	UPROPERTY()
+	class UCW_HUD* PlayerHUD;
+	
+	class UCIKAnimInstance* AnimationInstance;
 
-	/** Getter for the bool */
-	UFUNCTION(BlueprintCallable, Category = Weapon)
-	bool GetHasRifle();
+	bool IsZooming = false;
+	float ZoomRatio = 0.0f;
+	bool IsFirstPerson = true;
+	
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* LookAction;
 
 	UFUNCTION(BlueprintCallable)
 	void Test();
@@ -182,23 +179,12 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void EquipItem(TSubclassOf<AActor> _class);
+
+	/////////////////////////////////////////////////////////////////////////////////////
 protected:
-	/** Called for movement input */
-	void Move(const FInputActionValue& Value);
-
-	/** Called for looking input */
-	void Look(const FInputActionValue& Value);
-
-	void Zoom();
-	void StopZoom();
-
-	bool M_IsZooming = false;
-	float M_ZoomRatio = 0.0f;
-	bool M_IsFirstPerson = true;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	FRotator SpineRotationX;
-
+	//
+	// REPLICATION FUNCTIONS
+	//
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_Test();
 	bool Server_Test_Validate();
@@ -254,43 +240,22 @@ protected:
 	bool Server_EndSprint_Validate();
 	void Server_EndSprint_Implementation();
 
-	UFUNCTION()
-	void SetRHandAimAlpha(float _alpha);
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
-	UTP_WeaponComponent* M_CurrentWeapon = nullptr;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
-	AWeapon_Melee* M_MeleeWeapon = nullptr;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Weapon)
-	AActor* EquipedWeapon = nullptr;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly);
-	AActor* M_EquipedItem = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite);
-	USceneComponent* RHand_IK_Component = nullptr;
-
-	FTransform RHandDefaultTransform;
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_StartAim();
+	bool Server_StartAim_Validate();
+	void Server_StartAim_Implementation();
 	
-	FTimeline AimTimeline;
-	UPROPERTY(EditAnywhere)
-	UCurveFloat* AimCurveFloat;
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_StopAim();
+	bool Server_StopAim_Validate();
+	void Server_StopAim_Implementation();
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float RHandAimAlpha;
-	
-protected:
-	// APawn interface
-	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
-	// End of APawn interface
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_TryReload();
+	bool Server_TryReload_Validate();
+	void Server_TryReload_Implementation();
 
 public:
-	
-	/** Returns FirstPersonCameraComponent subobject **/
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
-
 	UCW_HUD* GetHUD() const {return PlayerHUD;}
-
 };

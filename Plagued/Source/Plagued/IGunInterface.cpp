@@ -7,3 +7,7 @@
 void IIGunInterface::Fire()
 {
 }
+
+void IIGunInterface::Reload()
+{
+}

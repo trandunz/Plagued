@@ -24,5 +24,10 @@ class PLAGUED_API IIGunInterface
 public:
 	APlayerController* InstigatorController;
 	
+	int32 CurrentAmmo;
+	
+	int32 MaxAmmo;
+	
 	virtual void Fire();
+	virtual void Reload();
 };

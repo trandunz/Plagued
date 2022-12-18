@@ -70,7 +70,7 @@ void UTP_WeaponComponent::AttachWeapon(APlaguedCharacter* TargetCharacter)
 	//AttachToComponent(Character->GetOwner()-, AttachmentRules, FName(TEXT("GripPoint")));
 	
 	// switch bHasRifle so the animation blueprint can switch to another animation set
-	Character->SetRifle(this);
+	//Character->SetRifle(this);
 
 	// Set up action bindings
 	if (APlayerController* PlayerController = Cast<APlayerController>(Character->GetController()))

@@ -77,3 +77,34 @@ void UCW_HUD::ShowInteractText(bool _show, FString _message)
 		InteractText->SetVisibility(ESlateVisibility::Hidden);
 	}
 }
+
+void UCW_HUD::ShowAmmoText(bool _show)
+{
+	if (_show)
+    {
+    	AmmoCount->SetVisibility(ESlateVisibility::Visible);
+		MagCount->SetVisibility(ESlateVisibility::Visible);
+    }
+    else
+    {
+    	AmmoCount->SetVisibility(ESlateVisibility::Hidden);
+    	MagCount->SetVisibility(ESlateVisibility::Hidden);
+    }
+}
+
+void UCW_HUD::ShowAmmoText(int32 _currentAmmo, int32 _clipSize, int32 _additionalMags)
+{
+	AmmoCount->SetVisibility(ESlateVisibility::Visible);
+
+	AmmoCount->SetText(FText::FromString(FString::FromInt(_currentAmmo) + "/" + FString::FromInt(_clipSize)));
+	
+	if (_additionalMags > 0)
+	{
+		MagCount->SetVisibility(ESlateVisibility::Visible);
+		MagCount->SetText(FText::FromString("+" + FString::FromInt(_additionalMags)));
+	}
+	else
+	{
+		MagCount->SetVisibility(ESlateVisibility::Hidden);
+	}
+}

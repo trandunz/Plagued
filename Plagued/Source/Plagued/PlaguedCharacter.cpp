@@ -19,8 +19,8 @@
 #include "IInteractInterface.h"
 #include "AC_InventorySystem.h"
 #include "AM1911.h"
+#include "CIKAnimInstance.h"
 #include "ItemData.h"
-#include "Components/SplineMeshComponent.h"
 #include "Net/UnrealNetwork.h"
 
 
@@ -29,11 +29,8 @@
 
 APlaguedCharacter::APlaguedCharacter()
 {
-	bReplicates = true;
-	bAlwaysRelevant = true;
-	
-	// Character doesnt have a rifle at start
-	bHasRifle = false;
+	//bReplicates = true;
+	//bAlwaysRelevant = true;
 
 	FAttachmentTransformRules AttachmentRules(EAttachmentRule::KeepRelative, false);
 	
@@ -51,19 +48,9 @@ APlaguedCharacter::APlaguedCharacter()
 	Arm->AttachToComponent(GetMesh(), AttachmentRules, FName("Head"));
 	Arm->SocketOffset = {0,70,-20};
 
-	MeleeWeaponSocket = CreateDefaultSubobject<USceneComponent>(TEXT("Melee_Weapon_Socket"));
-	
-	MeleeWeaponSocket->AttachToComponent(GetMesh(), AttachmentRules, FName("RightHandIndex1"));
-
-	HandGunSocket = CreateDefaultSubobject<USceneComponent>(TEXT("Hand_Gun_Socket"));
-	HandGunSocket->AttachToComponent(GetMesh(), AttachmentRules, FName("RightHandIndex1"));
-
 	GetCharacterMovement()->SetIsReplicated(true);
 
 	InventorySystem = CreateDefaultSubobject<UAC_InventorySystem>(TEXT("Inventory_System"));
-
-	RHand_IK_Component = CreateDefaultSubobject<USceneComponent>(TEXT("RHand_IK_Component"));
-	RHand_IK_Component->SetupAttachment(FirstPersonCameraComponent);
 
 	// Init Arm Lag
 	//Arm->bEnableCameraLag = true;
@@ -82,7 +69,10 @@ void APlaguedCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	DOREPLIFETIME(APlaguedCharacter, TryMeleeAttack);
 	DOREPLIFETIME(APlaguedCharacter, CanMeleeAttack);
 	DOREPLIFETIME(APlaguedCharacter, MovementSpeed);
+	DOREPLIFETIME(APlaguedCharacter, RifleEquiped);
 	DOREPLIFETIME(APlaguedCharacter, IsAiming);
+	DOREPLIFETIME(APlaguedCharacter, EquipedItem);
+	DOREPLIFETIME(APlaguedCharacter, SpineRotationX);
 }
 
 void APlaguedCharacter::BeginPlay()
@@ -101,15 +91,9 @@ void APlaguedCharacter::BeginPlay()
 
 	ToggleHUD();
 
-	if (AimCurveFloat)
-	{
-		FOnTimelineFloat timelineProgress;
-		timelineProgress.BindDynamic(this, &APlaguedCharacter::SetRHandAimAlpha);
-		AimTimeline.AddInterpFloat(AimCurveFloat, timelineProgress);
-	}
-
-	RHandDefaultTransform = RHand_IK_Component->GetRelativeTransform();
-	AimTimeline.SetPlayRate(4.0f);
+	AnimationInstance = Cast<UCIKAnimInstance>(GetMesh()->GetAnimInstance());
+	
+	PlayerHUD->ShowAmmoText(false);
 }
 
 void APlaguedCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -141,9 +125,9 @@ void APlaguedCharacter::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	AimTimeline.TickTimeline(DeltaSeconds);
+	//AimTimeline.TickTimeline(DeltaSeconds);
 
-	if (M_IsZooming)
+	if (IsZooming)
 	{
 		GetFirstPersonCameraComponent()->SetFieldOfView(FMath::Lerp(GetFirstPersonCameraComponent()->FieldOfView, 40.0f, DeltaSeconds * 10.0f));
 	}
@@ -155,6 +139,21 @@ void APlaguedCharacter::Tick(const float DeltaSeconds)
 	InteractRaycast();
 
 	GetCharacterMovement()->MaxWalkSpeed = FMath::Lerp(GetCharacterMovement()->MaxWalkSpeed, MovementSpeed, DeltaSeconds * 10.0f);
+
+	if (EquipedItem)
+	{
+		if (IIGunInterface* gun = Cast<IIGunInterface>(EquipedItem))
+		{
+			if (PlayerHUD)
+			{
+				PlayerHUD->ShowAmmoText(gun->CurrentAmmo, gun->MaxAmmo, 0);
+			}
+		}
+		else
+		{
+			PlayerHUD->ShowAmmoText(false);
+		}
+	}
  }
 
 void APlaguedCharacter::AttachCameraToTPP()
@@ -171,9 +170,9 @@ void APlaguedCharacter::AttachCameraToFPP()
 
 void APlaguedCharacter::ChangePerspective()
 {
-	M_IsFirstPerson = !M_IsFirstPerson;
+	IsFirstPerson = !IsFirstPerson;
 
-	if (M_IsFirstPerson)
+	if (IsFirstPerson)
 	{
 		AttachCameraToFPP();
 	}
@@ -237,6 +236,7 @@ void APlaguedCharacter::ToggleInventoryMenu()
 
 			APlayerController* controller = GetController<APlayerController>();
 			controller->SetShowMouseCursor(false);
+			controller->SetInputMode(FInputModeGameOnly());
 			
 			ToggleHUD();
 		}
@@ -247,6 +247,8 @@ void APlaguedCharacter::ToggleInventoryMenu()
 			PlayerInventory = CreateWidget<UCW_Inventory>(controller, PlayerInventoryClass);
 			check(PlayerInventory);
 			PlayerInventory->AddToPlayerScreen();
+			controller->SetInputMode(FInputModeGameAndUI());
+			controller->SetShowMouseCursor(true);
 
 			ToggleHUD();
 		}
@@ -276,31 +278,34 @@ void APlaguedCharacter::ToggleHUD()
 void APlaguedCharacter::StartAim()
 {
 	//IsMeleeStance = true;
-	IsAiming = true;
+	
 
-	AimTimeline.Play();
-
-	if (RHand_IK_Component && M_EquipedItem)
+	if (!HasAuthority())
 	{
-		if (USkeletalMeshComponent* itemMesh = M_EquipedItem->FindComponentByClass<class USkeletalMeshComponent>())
-		{
-			FTransform relative = itemMesh->GetSocketTransform(FName("RightHand")).GetRelativeTransform(GetMesh()->GetSocketTransform(FName("S_AimPoint")));
-			FVector difference {(RHand_IK_Component->GetRelativeLocation().X - relative.GetLocation().X),
-				(RHand_IK_Component->GetRelativeLocation().Y - (-relative.GetLocation().Y)),
-				(RHand_IK_Component->GetRelativeLocation().Z - relative.GetLocation().Z)
-			};
-			RHand_IK_Component->SetRelativeLocation(difference);
-			RHand_IK_Component->SetRelativeRotation(relative.GetRotation());
-		}
+		Server_StartAim();
 	}
+	else
+	{
+		IsAiming = true;
+	}
+
+	//AimTimeline.Play();
 }
 
 void APlaguedCharacter::EndAim()
 {
 	//IsMeleeStance = false;
-	IsAiming = false;
+	if (!HasAuthority())
+	{
+		Server_StopAim();
+	}
+	else
+	{
+		IsAiming = false;
+	}
+	
 
-	AimTimeline.Reverse();
+	//AimTimeline.Reverse();
 }
 
 void APlaguedCharacter::TryMelee()
@@ -332,21 +337,8 @@ void APlaguedCharacter::EndSprint()
 	}
 }
 
-void APlaguedCharacter::Jump()
-{
-	Super::Jump();
-}
-
-void APlaguedCharacter::StopJumping()
-{
-	Super::StopJumping();
-}
-
-//////////////////////////////////////////////////////////////////////////// Input
-
 void APlaguedCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
 {
-	// Set up action bindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(PlayerInputComponent))
 	{
 		//Jumping
@@ -377,6 +369,8 @@ void APlaguedCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 
 		EnhancedInputComponent->BindAction(Sprint, ETriggerEvent::Triggered, this, &APlaguedCharacter::StartSprint);
 		EnhancedInputComponent->BindAction(Sprint, ETriggerEvent::Completed, this, &APlaguedCharacter::EndSprint);
+
+		EnhancedInputComponent->BindAction(Reload, ETriggerEvent::Triggered, this, &APlaguedCharacter::TryReloadGun);
 	}
 }
 
@@ -404,20 +398,45 @@ void APlaguedCharacter::Look(const FInputActionValue& Value)
 		// add yaw and pitch input to controller
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
-		
-		SpineRotationX = {GetControlRotation().Pitch * -1, 0, 0};
-		Server_SpineRotation(GetControlRotation().Pitch * -1);
+
+		if (!HasAuthority())
+		{
+			Server_SpineRotation(GetControlRotation().Pitch * -1);
+		}
+		else
+		{
+			SpineRotationX = {0, 0, GetControlRotation().Pitch * -1};
+		}
 	}
 }
 
 void APlaguedCharacter::Zoom()
 {
-	M_IsZooming = true;
+	IsZooming = true;
 }
 
 void APlaguedCharacter::StopZoom()
 {
-	M_IsZooming = false;
+	IsZooming = false;
+}
+
+void APlaguedCharacter::TryReloadGun()
+{
+	if (!HasAuthority())
+	{
+		Server_TryReload();
+	}
+	else
+	{
+		if (EquipedItem)
+		{
+			if (IIGunInterface* gun = Cast<IIGunInterface>(EquipedItem))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Reload Gun"));
+				gun->Reload();
+			}
+		}
+	}
 }
 
 bool APlaguedCharacter::Server_Test_Validate()
@@ -437,7 +456,7 @@ bool APlaguedCharacter::Server_SpineRotation_Validate(float _xRotation)
 
 void APlaguedCharacter::Server_SpineRotation_Implementation(float _xRotation)
 {
-	Multi_SpineRotation(_xRotation);
+	SpineRotationX = {0, 0, _xRotation};
 }
 
 bool APlaguedCharacter::Multi_SpineRotation_Validate(float _xRotation)
@@ -447,31 +466,7 @@ bool APlaguedCharacter::Multi_SpineRotation_Validate(float _xRotation)
 
 void APlaguedCharacter::Multi_SpineRotation_Implementation(float _xRotation)
 {
-	SpineRotationX = {0, 0 ,_xRotation};
-}
-
-void APlaguedCharacter::SetHasRifle(bool bNewHasRifle)
-{
-	bHasRifle = bNewHasRifle;
-}
-
-void APlaguedCharacter::SetRifle(UTP_WeaponComponent* _rifle)
-{
-	M_CurrentWeapon = _rifle;
-
-	if (_rifle != nullptr)
-	{
-		bHasRifle = true;
-	}
-	else
-	{
-		bHasRifle = false;
-	}
-}
-
-bool APlaguedCharacter::GetHasRifle()
-{
-	return bHasRifle;
+	SpineRotationX = {0, 0, _xRotation};
 }
 
 void APlaguedCharacter::Test()
@@ -487,9 +482,9 @@ void APlaguedCharacter::FireWeapon()
 	}
 	else
 	{
-		if (M_EquipedItem != nullptr)
+		if (EquipedItem != nullptr)
 		{
-			Cast<IIGunInterface>(M_EquipedItem)->Fire();
+			Cast<IIGunInterface>(EquipedItem)->Fire();
 		}
 	}
 }
@@ -527,39 +522,37 @@ void APlaguedCharacter::ToggleWeapon(AActor* _weapon)
 {
 	if (AWeapon_Melee* meleeWeapon = Cast<AWeapon_Melee>(_weapon))
 	{
-		M_MeleeWeapon = meleeWeapon;
-		FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
-		M_MeleeWeapon->AttachToComponent(MeleeWeaponSocket, AttachmentRules);
 	}
 	else if (IIGunInterface* gun = Cast<IIGunInterface>(_weapon))
 	{
-		EquipedWeapon = _weapon;
+		RifleEquiped = true;
+		
 		gun->InstigatorController = Cast<APlayerController>(GetController());
 		FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
-		EquipedWeapon->AttachToComponent(HandGunSocket, AttachmentRules);
+		_weapon->AttachToComponent(GetMesh(), AttachmentRules, FName("S_HandR"));
 	}
 }
 
 void APlaguedCharacter::EquipItem(TSubclassOf<AActor> _class)
 {
 	UE_LOG(LogTemp, Warning, TEXT("Try Equip Item"));
-
+	
 	if (!HasAuthority())
 	{
 		Server_EquipItem(_class);
 	}
 	else
 	{
-		if (M_EquipedItem)
+		if (EquipedItem)
 		{
-			M_EquipedItem->GetOwner()->Destroy();
+			EquipedItem->GetOwner()->Destroy();
 		}
 	
-		M_EquipedItem = GetWorld()->SpawnActor<AActor>(_class);
+		EquipedItem = GetWorld()->SpawnActor<AActor>(_class);
 		FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
-		M_EquipedItem->AttachToComponent(RootComponent, AttachmentRules);
+		EquipedItem->AttachToComponent(RootComponent, AttachmentRules);
 
-		ToggleWeapon(M_EquipedItem);
+		ToggleWeapon(EquipedItem);
 	}
 }
 
@@ -570,9 +563,12 @@ bool APlaguedCharacter::Server_FireWeapon_Validate()
 
 void APlaguedCharacter::Server_FireWeapon_Implementation()
 {
-	if (M_EquipedItem != nullptr)
+	if (EquipedItem != nullptr)
 	{
-		Cast<IIGunInterface>(M_EquipedItem)->Fire();
+		if (IIGunInterface* gun = Cast<IIGunInterface>(EquipedItem))
+		{
+			gun->Fire();
+		}
 	}
 }
 
@@ -635,16 +631,16 @@ bool APlaguedCharacter::Server_EquipItem_Validate(TSubclassOf<AActor> _class)
 
 void APlaguedCharacter::Server_EquipItem_Implementation(TSubclassOf<AActor> _class)
 {
-	if (M_EquipedItem)
+	if (EquipedItem)
 	{
-		M_EquipedItem->GetOwner()->Destroy();
+		EquipedItem->GetOwner()->Destroy();
 	}
 	
-	M_EquipedItem = GetWorld()->SpawnActor<AActor>(_class);
+	EquipedItem = GetWorld()->SpawnActor<AActor>(_class);
 	FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
-	M_EquipedItem->AttachToComponent(RootComponent, AttachmentRules);
+	EquipedItem->AttachToComponent(RootComponent, AttachmentRules);
 	
-	ToggleWeapon(M_EquipedItem);
+	ToggleWeapon(EquipedItem);
 }
 
 bool APlaguedCharacter::Server_StartSprint_Validate()
@@ -667,13 +663,38 @@ void APlaguedCharacter::Server_EndSprint_Implementation()
 	MovementSpeed = WalkSpeed;
 }
 
-void APlaguedCharacter::SetRHandAimAlpha(float _alpha)
+bool APlaguedCharacter::Server_StartAim_Validate()
 {
-	RHandAimAlpha = _alpha;
-	UE_LOG(LogTemp, Warning, TEXT("Aim Timeline Value: %f"), RHandAimAlpha);
+	return true;
+}
 
-	if (!IsAiming && _alpha >= 1)
+void APlaguedCharacter::Server_StartAim_Implementation()
+{
+	IsAiming = true;
+}
+
+bool APlaguedCharacter::Server_StopAim_Validate()
+{
+	return true;
+}
+
+void APlaguedCharacter::Server_StopAim_Implementation()
+{
+	IsAiming = false;
+}
+
+bool APlaguedCharacter::Server_TryReload_Validate()
+{
+	return true;
+}
+
+void APlaguedCharacter::Server_TryReload_Implementation()
+{
+	if (EquipedItem)
 	{
-		RHand_IK_Component->SetRelativeTransform(RHandDefaultTransform);
+		if (IIGunInterface* gun = Cast<IIGunInterface>(EquipedItem))
+		{
+			gun->Reload();
+		}
 	}
 }

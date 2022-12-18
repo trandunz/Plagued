@@ -20,6 +20,9 @@ public:
 	void ShowInteractText(bool _show);
 	void ShowInteractText(bool _show, FString _message);
 
+	void ShowAmmoText(bool _show);
+	void ShowAmmoText(int32 _currentAmmo, int32 _clipSize, int32 _additionalMags);
+
 	UPROPERTY(EditAnywhere, meta = (BindWidget))
 	class UImage* Slot_Item;
 	UPROPERTY(EditAnywhere, meta = (BindWidget))
@@ -37,5 +40,10 @@ public:
 	
 	UPROPERTY(EditAnywhere, meta = (BindWidget))
 	UTextBlock* InteractText;
+
+	UPROPERTY(EditAnywhere, meta = (BindWidget))
+	UTextBlock* AmmoCount;
+
+	UPROPERTY(EditAnywhere, meta = (BindWidget))
+	UTextBlock* MagCount;
 };
- 
