@@ -62,6 +62,9 @@ class APlaguedCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
 	class UInputAction* Reload;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
+	class UInputAction* ChangeFirerate;
+
 public:
 	APlaguedCharacter();
 
@@ -84,6 +87,9 @@ public:
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadWrite);
 	float MovementSpeed = 500.0f;
+
+	UPROPERTY()
+	bool IsFiring = false;
 	
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<class UCW_HUD> PlayerHUDClass;
@@ -108,6 +114,9 @@ public:
 
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly)
 	FRotator SpineRotationX;
+
+	UPROPERTY(EditAnywhere)
+	float FireRate = 0.1;
 protected:
 	virtual void BeginPlay();
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -141,6 +150,11 @@ protected:
 
 	void TryReloadGun();
 
+	void StartFire();
+	void EndFire();
+
+	void ChangeFireRate();
+
 	FHitResult* LastRaycastHit = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=MyCharacter, meta=(AllowPrivateAccess = "true"))
@@ -157,6 +171,8 @@ protected:
 	bool IsZooming = false;
 	float ZoomRatio = 0.0f;
 	bool IsFirstPerson = true;
+
+	float FireTimer = 0.0f;
 	
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))

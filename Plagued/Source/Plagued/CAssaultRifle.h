@@ -6,6 +6,7 @@
 #include "IGunInterface.h"
 #include "GameFramework/Actor.h"
 #include "NiagaraComponent.h"
+#include "../../../../../../../../Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.29.30133/INCLUDE/stdbool.h"
 #include "CAssaultRifle.generated.h"
 
 UCLASS()
@@ -19,6 +20,10 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+	virtual void ReleaseMouse() override;
+
+	virtual void ChangeFireType() override;
+	
 	UPROPERTY(EditAnywhere, Category = "Firing")
 	UNiagaraSystem* MuzzleFlash;
 
@@ -27,10 +32,15 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	class USoundBase* FireSound;
+
+	UPROPERTY(Replicated, EditAnywhere, BlueprintReadOnly, meta=(AllowPrivateAccess = "true"))
+	TObjectPtr<class UCGunComponent> GunComponent;
 	
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+
+	virtual void SetShotsFiredBasedOnFireType() override;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta=(AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMeshComponent> Mesh;
@@ -43,6 +53,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UAnimMontage* ShootMontage;
+
+	UPROPERTY(Replicated)
+	int32 ShotsFiredPerPress = 0;
 	
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_Attack();
@@ -59,4 +72,5 @@ public:
 
 	virtual void Fire() override;
 	virtual void Reload() override;
+	virtual UCGunComponent* GetGunComponent() override;
 };

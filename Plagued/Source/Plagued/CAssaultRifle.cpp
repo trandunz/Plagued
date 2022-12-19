@@ -3,6 +3,7 @@
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
+#include "CGunComponent.h"
 #include "Net/UnrealNetwork.h"
 
 ACAssaultRifle::ACAssaultRifle()
@@ -17,6 +18,8 @@ ACAssaultRifle::ACAssaultRifle()
 	Barrel = CreateDefaultSubobject<UArrowComponent>(TEXT("Barrel"));
 	Barrel->SetupAttachment(Mesh);
 
+	GunComponent = CreateOptionalDefaultSubobject<UCGunComponent>(TEXT("Gun Component"));
+	
 	MaxAmmo = 30;
 	CurrentAmmo = MaxAmmo;
 }
@@ -24,11 +27,65 @@ ACAssaultRifle::ACAssaultRifle()
 void ACAssaultRifle::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(ACAssaultRifle, GunComponent);
+	DOREPLIFETIME(ACAssaultRifle, ShotsFiredPerPress);
+}
+
+void ACAssaultRifle::ReleaseMouse()
+{
+	SetShotsFiredBasedOnFireType();
+}
+
+void ACAssaultRifle::ChangeFireType()
+{
+	if (GunComponent)
+	{
+		for(int i = 0 ; i < GunComponent->AvailableFireTypes.Num() + 1; i++)
+		{
+			if (i == GunComponent->AvailableFireTypes.Num())
+			{
+				GunComponent->FireType = GunComponent->AvailableFireTypes[0];
+				break;
+			}
+			else if (GunComponent->FireType != GunComponent->AvailableFireTypes[i] && static_cast<int8>(GunComponent->AvailableFireTypes[i]) > static_cast<int8>(GunComponent->FireType))
+			{
+				GunComponent->FireType = GunComponent->AvailableFireTypes[i];
+				break;
+			}
+		}
+		SetShotsFiredBasedOnFireType();
+	}
 }
 
 void ACAssaultRifle::BeginPlay()
 {
 	Super::BeginPlay();
+
+	SetShotsFiredBasedOnFireType();
+}
+
+void ACAssaultRifle::SetShotsFiredBasedOnFireType()
+{
+	if (GunComponent)
+	{
+		switch(GunComponent->FireType)
+		{
+		case EFireType::BURST:
+			{
+				ShotsFiredPerPress = 3;
+				break;	
+			}
+		case EFireType::AUTO:
+			{
+				ShotsFiredPerPress = MaxAmmo;
+				break;	
+			}
+		default:
+			ShotsFiredPerPress = 1;
+			break;
+		}
+	}
 }
 
 bool ACAssaultRifle::Server_Attack_Validate()
@@ -49,6 +106,7 @@ bool ACAssaultRifle::Multi_Attack_Validate()
 void ACAssaultRifle::Multi_Attack_Implementation()
 {
 	CurrentAmmo--;
+	ShotsFiredPerPress--;
 	
 	if (ShootMontage)
 	{
@@ -75,7 +133,7 @@ void ACAssaultRifle::Tick(float DeltaTime)
 
 void ACAssaultRifle::Fire()
 {
-	if (BulletPrefab && CurrentAmmo > 0)
+	if (BulletPrefab && CurrentAmmo > 0 && ShotsFiredPerPress > 0)
 	{
 		if (InstigatorController)
 		{
@@ -90,5 +148,10 @@ void ACAssaultRifle::Fire()
 void ACAssaultRifle::Reload()
 {
 	CurrentAmmo = MaxAmmo;
+}
+
+UCGunComponent* ACAssaultRifle::GetGunComponent()
+{
+	return GunComponent;
 }
 

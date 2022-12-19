@@ -108,3 +108,44 @@ void UCW_HUD::ShowAmmoText(int32 _currentAmmo, int32 _clipSize, int32 _additiona
 		MagCount->SetVisibility(ESlateVisibility::Hidden);
 	}
 }
+
+void UCW_HUD::ShowFireType(bool _show)
+{
+	if (_show)
+	{
+		FireTypeText->SetVisibility(ESlateVisibility::Visible);
+	}
+	else
+	{
+		FireTypeText->SetVisibility(ESlateVisibility::Hidden);
+	}
+}
+
+void UCW_HUD::ShowFireType(bool _show, EFireType _fireType)
+{
+	if (_show)
+	{
+		FireTypeText->SetVisibility(ESlateVisibility::Visible);
+	}
+	else
+	{
+		FireTypeText->SetVisibility(ESlateVisibility::Hidden);
+	}
+
+	switch(_fireType)
+	{
+	case EFireType::BURST:
+		{
+			FireTypeText->SetText(FText::FromString("Burst Fire"));
+			break;	
+		}
+	case EFireType::AUTO:
+		{
+			FireTypeText->SetText(FText::FromString("Full Auto"));
+			break;	
+		}
+	default:
+		FireTypeText->SetText(FText::FromString("Single Fire"));
+		break;
+	}
+}

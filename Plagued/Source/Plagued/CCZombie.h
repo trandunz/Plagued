@@ -38,14 +38,12 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void TakeDamage(float _amount);
 
-	UFUNCTION()
-	virtual void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
-
+	void TakeDamage(float _amount, FVector _bulletDirection, FVector _hitpoint, FName _boneName);
+	
 	UFUNCTION()
 	void OnDeath();
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	class USphereComponent* HeadCollider;
+
+	void OnDeath(FVector _bulletDirection, FVector _hitpoint, FName _boneName);
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UPawnSensingComponent* PawnSensing;
@@ -58,6 +56,8 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float MaxHealth;
+
+	bool IsRagdoll = false;
 
 protected:
 	UFUNCTION(Server, Reliable, WithValidation)
@@ -74,4 +74,9 @@ protected:
 	void Server_TakeDamage(float _amount);
 	bool Server_TakeDamage_Validate(float _amount);
 	void Server_TakeDamage_Implementation(float _amount);
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_TakeDamageWithImpulse(float _amount, FVector _bulletDirection, FVector _hitpoint, FName _boneName);
+	bool Server_TakeDamageWithImpulse_Validate(float _amount, FVector _bulletDirection, FVector _hitpoint, FName _boneName);
+	void Server_TakeDamageWithImpulse_Implementation(float _amount, FVector _bulletDirection, FVector _hitpoint, FName _boneName);
 };

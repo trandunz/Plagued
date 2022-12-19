@@ -33,6 +33,7 @@ AC556x45::AC556x45()
 	ProjectileMovement->MaxSpeed = 5000.f;
 	ProjectileMovement->bRotationFollowsVelocity = true;
 	ProjectileMovement->bShouldBounce = false;
+	ProjectileMovement->ProjectileGravityScale = 0.01;
 
 	Damage = 30.0f;
 }
@@ -60,7 +61,14 @@ void AC556x45::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiv
 		if (ACCZombie* zombie = Cast<ACCZombie>(OtherActor))
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Zombie Hit"));
-			zombie->TakeDamage(Damage);
+			if (Hit.BoneName == FName("Head"))
+			{
+				zombie->TakeDamage(100, -Hit.ImpactNormal, Hit.ImpactPoint, Hit.BoneName);
+			}
+			else
+			{
+				zombie->TakeDamage(Damage, -Hit.ImpactNormal, Hit.ImpactPoint, Hit.BoneName);
+			}
 		}
 
 		Destroy();

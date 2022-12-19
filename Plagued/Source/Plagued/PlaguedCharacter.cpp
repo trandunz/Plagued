@@ -21,6 +21,7 @@
 #include "AM1911.h"
 #include "CIKAnimInstance.h"
 #include "ItemData.h"
+#include "CGunComponent.h"
 #include "Net/UnrealNetwork.h"
 
 
@@ -147,11 +148,27 @@ void APlaguedCharacter::Tick(const float DeltaSeconds)
 			if (PlayerHUD)
 			{
 				PlayerHUD->ShowAmmoText(gun->CurrentAmmo, gun->MaxAmmo, 0);
+				PlayerHUD->ShowFireType(true, gun->GetGunComponent()->FireType);
 			}
 		}
-		else
+	}
+	else if (PlayerHUD)
+	{
+		PlayerHUD->ShowAmmoText(false);
+		PlayerHUD->ShowFireType(false);
+	}
+
+	if (FireTimer > 0)
+	{
+		FireTimer -= DeltaSeconds;
+	}
+	else
+	{
+		FireTimer = FireRate;
+
+		if (IsFiring)
 		{
-			PlayerHUD->ShowAmmoText(false);
+			FireWeapon();
 		}
 	}
  }
@@ -353,7 +370,8 @@ void APlaguedCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 
 		EnhancedInputComponent->BindAction(TestAction, ETriggerEvent::Triggered, this, &APlaguedCharacter::Test);
 
-		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &APlaguedCharacter::FireWeapon);
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &APlaguedCharacter::StartFire);
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Completed, this, &APlaguedCharacter::EndFire);
 
 		EnhancedInputComponent->BindAction(ZoomAction, ETriggerEvent::Triggered, this, &APlaguedCharacter::Zoom);
 		EnhancedInputComponent->BindAction(ZoomAction, ETriggerEvent::Completed, this, &APlaguedCharacter::StopZoom);
@@ -371,6 +389,8 @@ void APlaguedCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 		EnhancedInputComponent->BindAction(Sprint, ETriggerEvent::Completed, this, &APlaguedCharacter::EndSprint);
 
 		EnhancedInputComponent->BindAction(Reload, ETriggerEvent::Triggered, this, &APlaguedCharacter::TryReloadGun);
+
+		EnhancedInputComponent->BindAction(ChangeFirerate, ETriggerEvent::Triggered, this, &APlaguedCharacter::ChangeFireRate);
 	}
 }
 
@@ -437,6 +457,42 @@ void APlaguedCharacter::TryReloadGun()
 			}
 		}
 	}
+}
+
+void APlaguedCharacter::StartFire()
+{
+	if (EquipedItem != nullptr)
+	{
+		if (IIGunInterface* gun = Cast<IIGunInterface>(EquipedItem))
+		{
+			IsFiring = true;
+		}
+	}
+}
+
+void APlaguedCharacter::EndFire()
+{
+	IsFiring = false;
+
+	if (EquipedItem != nullptr)
+	{
+		if (IIGunInterface* gun = Cast<IIGunInterface>(EquipedItem))
+		{
+			gun->ReleaseMouse();
+		}
+	}
+}
+
+void APlaguedCharacter::ChangeFireRate()
+{
+	if (EquipedItem != nullptr)
+	{
+		if (IIGunInterface* gun = Cast<IIGunInterface>(EquipedItem))
+		{
+			gun->ChangeFireType();
+		}
+	}
+	
 }
 
 bool APlaguedCharacter::Server_Test_Validate()

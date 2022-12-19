@@ -7,6 +7,8 @@
 #include "GameFramework/Actor.h"
 #include "C556x45.generated.h"
 
+
+
 UCLASS()
 class PLAGUED_API AC556x45 : public AActor, public IIBulletInterface
 {

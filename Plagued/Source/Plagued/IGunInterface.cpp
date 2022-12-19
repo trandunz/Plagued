@@ -11,3 +11,20 @@ void IIGunInterface::Fire()
 void IIGunInterface::Reload()
 {
 }
+
+void IIGunInterface::SetShotsFiredBasedOnFireType()
+{
+}
+
+void IIGunInterface::ReleaseMouse()
+{
+}
+
+void IIGunInterface::ChangeFireType()
+{
+}
+
+UCGunComponent* IIGunInterface::GetGunComponent()
+{
+	return {};
+}

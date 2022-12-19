@@ -30,4 +30,9 @@ public:
 	
 	virtual void Fire();
 	virtual void Reload();
+	virtual void SetShotsFiredBasedOnFireType();
+	virtual void ReleaseMouse();
+	virtual void ChangeFireType();
+
+	virtual class UCGunComponent* GetGunComponent();
 };

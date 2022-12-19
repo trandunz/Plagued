@@ -7,6 +7,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/GameSession.h"
 #include "Components/SphereComponent.h"
+#include "Components/CapsuleComponent.h"
 
 // Sets default values
 ACCZombie::ACCZombie()
@@ -20,23 +21,13 @@ ACCZombie::ACCZombie()
 
 	PawnSensing = CreateDefaultSubobject<UPawnSensingComponent>(TEXT("Pawn Sensing"));
 	GetCharacterMovement()->MaxWalkSpeed = 60.0f;
-
-	HeadCollider = CreateDefaultSubobject<USphereComponent>(TEXT("Head Collider"));
-	FAttachmentTransformRules AttachmentRules(EAttachmentRule::KeepRelative, false);
-	HeadCollider->InitSphereRadius(20.0f);
-	HeadCollider->AttachToComponent(GetMesh(), AttachmentRules, FName("Head"));
-	HeadCollider->BodyInstance.SetCollisionProfileName("BlockAll");
-	HeadCollider->SetWalkableSlopeOverride(FWalkableSlopeOverride(WalkableSlope_Unwalkable, 0.f));
-	HeadCollider->CanCharacterStepUpOn = ECB_No;
 }
 
 // Called when the game starts or when spawned
 void ACCZombie::BeginPlay()
 {
 	Super::BeginPlay();
-
-	HeadCollider->OnComponentHit.AddDynamic(this, &ACCZombie::OnHit);
-
+	
 	MaxHealth = 100.0f;
 	CurrentHealth = MaxHealth;
 }
@@ -69,9 +60,23 @@ bool ACCZombie::Server_TakeDamage_Validate(float _amount)
 void ACCZombie::Server_TakeDamage_Implementation(float _amount)
 {
 	CurrentHealth -= _amount;
-	if (CurrentHealth < 0)
+	if (CurrentHealth <= 0)
 	{
-		Destroy();
+		OnDeath();
+	}
+}
+
+bool ACCZombie::Server_TakeDamageWithImpulse_Validate(float _amount, FVector _bulletDirection, FVector _hitpoint, FName _boneName)
+{
+	return true;
+}
+
+void ACCZombie::Server_TakeDamageWithImpulse_Implementation(float _amount, FVector _bulletDirection, FVector _hitpoint, FName _boneName)
+{
+	CurrentHealth -= _amount;
+	if (CurrentHealth <= 0)
+	{
+		OnDeath(_bulletDirection, _hitpoint, _boneName);
 	}
 }
 
@@ -116,34 +121,110 @@ void ACCZombie::OnSeePawn(APawn* OtherPawn)
 
 void ACCZombie::TakeDamage(float _amount)
 {
-	if (!HasAuthority())
+	if (CurrentHealth > 0)
 	{
-		Server_TakeDamage(_amount);
-	}
-	else
-	{
-		CurrentHealth -= _amount;
-		if (CurrentHealth < 0)
+		if (!HasAuthority())
 		{
-			OnDeath();
+			Server_TakeDamage(_amount);
+		}
+		else
+		{
+			CurrentHealth -= _amount;
+			if (CurrentHealth <= 0)
+			{
+				OnDeath();
+			}
 		}
 	}
+	
 }
 
-void ACCZombie::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
-	FVector NormalImpulse, const FHitResult& Hit)
+void ACCZombie::TakeDamage(float _amount, FVector _bulletDirection, FVector _hitpoint, FName _boneName)
 {
-	if ((OtherActor != nullptr))
+	if (CurrentHealth > 0)
 	{
-		if (IIBulletInterface* bullet = Cast<IIBulletInterface>(OtherActor))
+		if (!HasAuthority())
 		{
-			TakeDamage(MaxHealth);
+			Server_TakeDamageWithImpulse(_amount, _bulletDirection, _hitpoint, _boneName);
+		}
+		else
+		{
+			CurrentHealth -= _amount;
+			if (CurrentHealth <= 0)
+			{
+				OnDeath(_bulletDirection, _hitpoint, _boneName);
+			}
 		}
 	}
 }
 
 void ACCZombie::OnDeath()
 {
-	Destroy();
+	SetReplicateMovement(false);
+
+	DetachFromControllerPendingDestroy();
+	
+	UCapsuleComponent* CapsuleComp = GetCapsuleComponent();
+	CapsuleComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	CapsuleComp->SetCollisionResponseToAllChannels(ECR_Ignore);
+
+	GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
+	SetActorEnableCollision(true);
+
+	if (!IsRagdoll)
+	{
+		// Ragdoll
+		GetMesh()->SetAllBodiesSimulatePhysics(true);
+		GetMesh()->SetSimulatePhysics(true);
+		GetMesh()->WakeAllRigidBodies();
+		GetMesh()->bBlendPhysics = true;
+
+		UCharacterMovementComponent* CharacterComp = Cast<UCharacterMovementComponent>(GetMovementComponent());
+		if (CharacterComp)
+		{
+			CharacterComp->StopMovementImmediately();
+			CharacterComp->DisableMovement();
+			CharacterComp->SetComponentTickEnabled(false);
+		}
+
+		SetLifeSpan(10.0f);
+		IsRagdoll = true;
+	}
+}
+
+void ACCZombie::OnDeath(FVector _bulletDirection, FVector _hitpoint, FName _boneName)
+{
+	SetReplicateMovement(false);
+
+	DetachFromControllerPendingDestroy();
+	
+	UCapsuleComponent* CapsuleComp = GetCapsuleComponent();
+	CapsuleComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	CapsuleComp->SetCollisionResponseToAllChannels(ECR_Ignore);
+
+	GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
+	SetActorEnableCollision(true);
+
+	if (!IsRagdoll)
+	{
+		// Ragdoll
+		GetMesh()->SetAllBodiesSimulatePhysics(true);
+		GetMesh()->SetSimulatePhysics(true);
+		GetMesh()->WakeAllRigidBodies();
+		GetMesh()->bBlendPhysics = true;
+
+		UCharacterMovementComponent* CharacterComp = Cast<UCharacterMovementComponent>(GetMovementComponent());
+		if (CharacterComp)
+		{
+			CharacterComp->StopMovementImmediately();
+			CharacterComp->DisableMovement();
+			CharacterComp->SetComponentTickEnabled(false);
+		}
+
+		SetLifeSpan(10.0f);
+		IsRagdoll = true;
+	}
+
+	GetMesh()->AddImpulseAtLocation(_bulletDirection * 50000, _hitpoint, _boneName);
 }
 

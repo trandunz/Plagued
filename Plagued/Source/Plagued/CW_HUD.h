@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "CGunComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/TextBlock.h"
 #include "CW_HUD.generated.h"
@@ -22,6 +23,9 @@ public:
 
 	void ShowAmmoText(bool _show);
 	void ShowAmmoText(int32 _currentAmmo, int32 _clipSize, int32 _additionalMags);
+
+	void ShowFireType(bool _show);
+	void ShowFireType(bool _show, EFireType _fireType);
 
 	UPROPERTY(EditAnywhere, meta = (BindWidget))
 	class UImage* Slot_Item;
@@ -46,4 +50,7 @@ public:
 
 	UPROPERTY(EditAnywhere, meta = (BindWidget))
 	UTextBlock* MagCount;
+
+	UPROPERTY(EditAnywhere, meta = (BindWidget))
+	UTextBlock* FireTypeText;
 };
