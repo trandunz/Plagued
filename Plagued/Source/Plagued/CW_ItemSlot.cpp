@@ -5,8 +5,10 @@
 
 #include <string>
 
+#include "Components/Border.h"
 #include "PlaguedCharacter.h"
 #include "Components/Image.h"
+#include "CInventoryTooltip.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 
@@ -37,6 +39,13 @@ void UCW_ItemSlot::NativePreConstruct()
 	}
 }
 
+void UCW_ItemSlot::NativeOnInitialized()
+{
+	Super::NativeOnInitialized();
+
+	SetupTooltip();
+}
+
 void UCW_ItemSlot::EquipItem()
 {
 	if (Quantity > 0)
@@ -53,6 +62,31 @@ void UCW_ItemSlot::EquipItem()
 						character->EquipItem(item->ItemClass);
 					}
 				}
+			}
+		}
+	}
+}
+
+void UCW_ItemSlot::SetupTooltip()
+{
+	if (Quantity > 0)
+	{
+		if (!TooltipWidgetPointer)
+		{
+			if (ToolTipWidgetClass)
+			{
+				TooltipWidgetPointer = CreateWidget<UCInventoryTooltip>(GetOwningPlayer(), ToolTipWidgetClass);
+				MasterBorder->SetToolTip(TooltipWidgetPointer);
+				SetupTooltip();
+			}
+		}
+		if (TooltipWidgetPointer)
+		{
+			if (FItemStruct* item = ItemData->FindRow<FItemStruct>(ItemID, nullptr))
+			{
+				TooltipWidgetPointer->DescriptionText->SetText(item->Description);
+				TooltipWidgetPointer->NameText->SetText(item->Name);
+				TooltipWidgetPointer->Icon->SetBrushFromTexture(item->Thumbnail);
 			}
 		}
 	}

@@ -50,6 +50,8 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+	TSubclassOf<AActor>* TryGetItem(FString _rowName);
+	
 	UPROPERTY(Replicated, EditAnywhere)
 	TArray<FSlotStruct> Content;
 protected:
@@ -57,7 +59,7 @@ protected:
 	virtual void BeginPlay() override;
 
 	UPROPERTY(EditAnywhere)
-	int InventorySize = 10;
+	int InventorySize = 14;
 
 	UPROPERTY(EditAnywhere)
 	UDataTable* ItemData;

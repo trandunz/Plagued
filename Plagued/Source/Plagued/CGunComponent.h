@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "CMagComponent.h"
 #include "Components/ActorComponent.h"
 #include "CGunComponent.generated.h"
 
@@ -20,6 +21,9 @@ class PLAGUED_API UCGunComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UCMagComponent* CurrentMag;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EFireType FireType = EFireType::SINGLE;
 

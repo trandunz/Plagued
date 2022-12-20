@@ -21,8 +21,10 @@ class PLAGUED_API UCW_InventoryGrid : public UUserWidget
 	void ConstructInventory();
 public:
 	void NativePreConstruct() override;
+	void NativeConstruct() override;
+	void NativeOnInitialized() override;
 
-	void DisplayInventory(UAC_InventorySystem* _inventory);
+	void DisplayInventory();
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<class UCW_ItemSlot> ItemSlotClass;
@@ -33,6 +35,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UAC_InventorySystem* InventorySystem;
 
-	UPROPERTY(EditAnywhere, meta = (BindWidget))
-	UWrapBox* Grid;
+	UPROPERTY(meta = (BindWidget))
+	UWrapBox* ItemGrid;
+
+	UPROPERTY(meta = (BindWidget))
+	UTextBlock* InventoryTitle;
+
+	UPROPERTY(EditAnywhere)
+	FString Title;
 };

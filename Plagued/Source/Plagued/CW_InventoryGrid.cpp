@@ -3,6 +3,8 @@
 
 #include "CW_InventoryGrid.h"
 #include "AC_InventorySystem.h"
+#include "PlaguedCharacter.h"
+#include "Components/TextBlock.h"
 
 void UCW_InventoryGrid::ConstructInventory()
 {
@@ -15,7 +17,8 @@ void UCW_InventoryGrid::ConstructInventory()
 			ItemSlot = CreateWidget<UCW_ItemSlot>(controller, ItemSlotClass);
 			ItemSlot->Quantity = Element.Quantity;
 			ItemSlot->ItemID = Element.ItemID;
-			Grid->AddChildToWrapBox(ItemSlot);
+			ItemSlot->SetupTooltip();
+			ItemGrid->AddChildToWrapBox(ItemSlot);
 		}
 	}
 }
@@ -27,12 +30,28 @@ void UCW_InventoryGrid::NativePreConstruct()
 	ConstructInventory();
 }
 
-void UCW_InventoryGrid::DisplayInventory(UAC_InventorySystem* _inventory)
+void UCW_InventoryGrid::NativeConstruct()
 {
-	if (Grid)
+	Super::NativeConstruct();
+	DisplayInventory();
+}
+
+void UCW_InventoryGrid::NativeOnInitialized()
+{
+	Super::NativeOnInitialized();
+	InventoryTitle->SetText(FText::FromString(Title));
+}
+
+void UCW_InventoryGrid::DisplayInventory()
+{
+	if (UAC_InventorySystem* inventory = Cast<APlaguedCharacter>(GetOwningPlayer<APlayerController>()->GetCharacter())->InventorySystem)
 	{
-		InventorySystem = _inventory;
-		Grid->ClearChildren();
-		ConstructInventory();
+		if (ItemGrid)
+		{
+			InventorySystem = inventory;
+			ItemGrid->ClearChildren();
+			InventoryTitle->SetText(FText::FromString(Title));
+			ConstructInventory();
+		}
 	}
 }

@@ -6,7 +6,6 @@ UAC_InventorySystem::UAC_InventorySystem()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 	SetIsReplicated(true);
-	Content.Init({}, InventorySize);
 }
 
 void UAC_InventorySystem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -16,12 +15,26 @@ void UAC_InventorySystem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	DOREPLIFETIME(UAC_InventorySystem, Content);
 }
 
+TSubclassOf<AActor>* UAC_InventorySystem::TryGetItem(FString _rowName)
+{
+	for (int i = 0; i < Content.Num(); i++)
+	{
+		if (FName(_rowName) == Content[i].ItemID && Content[i].Quantity > 0)
+		{
+			if (FItemStruct* item = ItemData->FindRow<FItemStruct>(FName(_rowName), nullptr))
+			{
+				return &item->ItemClass;
+			}
+		}
+	}
+	return {};
+}
 
 // Called when the game starts
 void UAC_InventorySystem::BeginPlay()
 {
 	Super::BeginPlay();
-	
+	Content.Init({}, InventorySize);
 }
 
 

@@ -147,7 +147,15 @@ void APlaguedCharacter::Tick(const float DeltaSeconds)
 		{
 			if (PlayerHUD)
 			{
-				PlayerHUD->ShowAmmoText(gun->CurrentAmmo, gun->MaxAmmo, 0);
+				if (UCMagComponent* mag = gun->GetCurrentMag())
+				{
+					PlayerHUD->ShowAmmoText(mag->CurrentAmmo,mag->MaxAmmo, 0);
+				}
+				else
+				{
+					PlayerHUD->ShowAmmoText(0,0, 0);
+				}
+				
 				PlayerHUD->ShowFireType(true, gun->GetGunComponent()->FireType);
 			}
 		}
@@ -601,14 +609,19 @@ void APlaguedCharacter::EquipItem(TSubclassOf<AActor> _class)
 	{
 		if (EquipedItem)
 		{
-			EquipedItem->GetOwner()->Destroy();
+			EquipedItem->RemoveFromRoot();
+			EquipedItem->Destroy();
+			EquipedItem = nullptr;
+			RifleEquiped = false;
 		}
+		else if (EquipedItem == nullptr)
+		{
+			EquipedItem = GetWorld()->SpawnActor<AActor>(_class);
+			FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
+			EquipedItem->AttachToComponent(RootComponent, AttachmentRules);
 	
-		EquipedItem = GetWorld()->SpawnActor<AActor>(_class);
-		FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
-		EquipedItem->AttachToComponent(RootComponent, AttachmentRules);
-
-		ToggleWeapon(EquipedItem);
+			ToggleWeapon(EquipedItem);
+		}
 	}
 }
 
@@ -689,14 +702,19 @@ void APlaguedCharacter::Server_EquipItem_Implementation(TSubclassOf<AActor> _cla
 {
 	if (EquipedItem)
 	{
-		EquipedItem->GetOwner()->Destroy();
+		EquipedItem->RemoveFromRoot();
+		EquipedItem->Destroy();
+		EquipedItem = nullptr;
+		RifleEquiped = false;
 	}
+	else if (EquipedItem == nullptr)
+	{
+		EquipedItem = GetWorld()->SpawnActor<AActor>(_class);
+		FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
+		EquipedItem->AttachToComponent(RootComponent, AttachmentRules);
 	
-	EquipedItem = GetWorld()->SpawnActor<AActor>(_class);
-	FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
-	EquipedItem->AttachToComponent(RootComponent, AttachmentRules);
-	
-	ToggleWeapon(EquipedItem);
+		ToggleWeapon(EquipedItem);
+	}
 }
 
 bool APlaguedCharacter::Server_StartSprint_Validate()

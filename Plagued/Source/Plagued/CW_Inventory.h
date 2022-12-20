@@ -19,7 +19,4 @@ public:
 	virtual void NativePreConstruct() override;
 
 	virtual void NativeConstruct() override;
-
-	UPROPERTY(EditAnywhere, meta = (BindWidget))
-	UCW_InventoryGrid* Grid;
 };

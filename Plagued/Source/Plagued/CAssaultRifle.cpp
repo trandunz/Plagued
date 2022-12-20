@@ -4,6 +4,8 @@
 #include "NiagaraFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "CGunComponent.h"
+#include "PlaguedCharacter.h"
+#include "AC_InventorySystem.h"
 #include "Net/UnrealNetwork.h"
 
 ACAssaultRifle::ACAssaultRifle()
@@ -20,8 +22,10 @@ ACAssaultRifle::ACAssaultRifle()
 
 	GunComponent = CreateOptionalDefaultSubobject<UCGunComponent>(TEXT("Gun Component"));
 	
-	MaxAmmo = 30;
-	CurrentAmmo = MaxAmmo;
+	if (GunComponent->CurrentMag)
+	{
+		GunComponent->CurrentMag->MaxAmmo = 30;
+	}
 }
 
 void ACAssaultRifle::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -58,6 +62,16 @@ void ACAssaultRifle::ChangeFireType()
 	}
 }
 
+UCMagComponent* ACAssaultRifle::GetCurrentMag()
+{
+	if (GunComponent)
+	{
+		return GunComponent->CurrentMag;
+	}
+
+	return nullptr;
+}
+
 void ACAssaultRifle::BeginPlay()
 {
 	Super::BeginPlay();
@@ -78,7 +92,7 @@ void ACAssaultRifle::SetShotsFiredBasedOnFireType()
 			}
 		case EFireType::AUTO:
 			{
-				ShotsFiredPerPress = MaxAmmo;
+				ShotsFiredPerPress = INT32_MAX;
 				break;	
 			}
 		default:
@@ -105,24 +119,28 @@ bool ACAssaultRifle::Multi_Attack_Validate()
 
 void ACAssaultRifle::Multi_Attack_Implementation()
 {
-	CurrentAmmo--;
-	ShotsFiredPerPress--;
+	if (GunComponent->CurrentMag)
+	{
+		GunComponent->CurrentMag->EjectRound();
 	
-	if (ShootMontage)
-	{
-		if (Mesh->GetAnimInstance())
+		ShotsFiredPerPress--;
+		
+		if (ShootMontage)
 		{
-			Mesh->GetAnimInstance()->Montage_Play(ShootMontage);
+			if (Mesh->GetAnimInstance())
+			{
+				Mesh->GetAnimInstance()->Montage_Play(ShootMontage);
+			}
 		}
-	}
-	if (MuzzleFlash)
-	{
-		UNiagaraComponent* NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAttached(MuzzleFlash, Mesh, NAME_None, Mesh->GetSocketLocation("Muzzle"), FRotator(0.f), EAttachLocation::Type::KeepRelativeOffset, true);
-		NiagaraComp->SetNiagaraVariableFloat(FString("StrengthCoef"), MFCoefStrength);
-	}
-	if (FireSound)
-	{
-		UGameplayStatics::PlaySoundAtLocation(GetWorld(), FireSound, GetActorLocation());
+		if (MuzzleFlash)
+		{
+			UNiagaraComponent* NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAttached(MuzzleFlash, Mesh, NAME_None, Mesh->GetSocketLocation("Muzzle"), FRotator(0.f), EAttachLocation::Type::KeepRelativeOffset, true);
+			NiagaraComp->SetNiagaraVariableFloat(FString("StrengthCoef"), MFCoefStrength);
+		}
+		if (FireSound)
+		{
+			UGameplayStatics::PlaySoundAtLocation(GetWorld(), FireSound, GetActorLocation());
+		}
 	}
 }
 
@@ -133,21 +151,44 @@ void ACAssaultRifle::Tick(float DeltaTime)
 
 void ACAssaultRifle::Fire()
 {
-	if (BulletPrefab && CurrentAmmo > 0 && ShotsFiredPerPress > 0)
+	if (GunComponent->CurrentMag)
 	{
-		if (InstigatorController)
+		if (BulletPrefab && !GunComponent->CurrentMag->IsEmpty() && ShotsFiredPerPress > 0)
 		{
-			// Spawn the projectile at the muzzle
-			GetWorld()->SpawnActor<AActor>(BulletPrefab, Barrel->GetComponentTransform());
+			if (InstigatorController)
+			{
+				// Spawn the projectile at the muzzle
+				GetWorld()->SpawnActor<AActor>(BulletPrefab, Barrel->GetComponentTransform());
 			
-			Server_Attack();
+				Server_Attack();
+			}
 		}
 	}
 }
 
 void ACAssaultRifle::Reload()
 {
-	CurrentAmmo = MaxAmmo;
+	if (GunComponent->CurrentMag)
+	{
+		GunComponent->CurrentMag->FillMag();
+	}
+	else
+	{
+		if (APlaguedCharacter* character = Cast<APlaguedCharacter>(GetNetOwningPlayer()))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Player Cast Worked"));
+			if (TSubclassOf<AActor>* magClassFromInventory = character->InventorySystem->TryGetItem("556x45_Mag"))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Mag Actor Worked"));
+				if (UCMagComponent* mag = Cast<UCMagComponent>(*magClassFromInventory))
+				{
+					UE_LOG(LogTemp, Warning, TEXT("Equip New Mag"));
+					GunComponent->CurrentMag = mag;
+				}
+			}
+		}
+		
+	}
 }
 
 UCGunComponent* ACAssaultRifle::GetGunComponent()

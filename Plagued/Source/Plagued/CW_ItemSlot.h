@@ -5,11 +5,9 @@
 #include "CoreMinimal.h"
 #include "AC_InventorySystem.h"
 #include "Blueprint/UserWidget.h"
+#include "CInventoryTooltip.h"
 #include "CW_ItemSlot.generated.h"
 
-/**
- * 
- */
 UCLASS()
 class PLAGUED_API UCW_ItemSlot : public UUserWidget
 {
@@ -18,8 +16,21 @@ class PLAGUED_API UCW_ItemSlot : public UUserWidget
 public:
 	void NativePreConstruct() override;
 
+	void NativeOnInitialized() override;
+
 	UFUNCTION(BlueprintCallable)
 	void EquipItem();
+
+	UFUNCTION(BlueprintCallable)
+	void SetupTooltip();
+
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<class UCInventoryTooltip> ToolTipWidgetClass;
+	UPROPERTY()
+	UCInventoryTooltip* TooltipWidgetPointer;
+	
+	UPROPERTY(meta = (BindWidget))
+	class UBorder* MasterBorder;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UDataTable* ItemData;

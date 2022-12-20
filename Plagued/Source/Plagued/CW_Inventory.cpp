@@ -15,13 +15,4 @@ void UCW_Inventory::NativePreConstruct()
 void UCW_Inventory::NativeConstruct()
 {
 	Super::NativeConstruct();
-
-	if (Grid)
-	{
-		if (UAC_InventorySystem* inventory = Cast<APlaguedCharacter>(GetOwningPlayer<APlayerController>()->GetCharacter())->InventorySystem)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("Show Inventory"));
-			Grid->DisplayInventory(inventory);
-		}
-	}
 }

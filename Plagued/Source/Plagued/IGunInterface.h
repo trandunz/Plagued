@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "CMagComponent.h"
 #include "UObject/Interface.h"
 #include "IGunInterface.generated.h"
 
@@ -24,15 +25,12 @@ class PLAGUED_API IIGunInterface
 public:
 	APlayerController* InstigatorController;
 	
-	int32 CurrentAmmo;
-	
-	int32 MaxAmmo;
-	
 	virtual void Fire();
 	virtual void Reload();
 	virtual void SetShotsFiredBasedOnFireType();
 	virtual void ReleaseMouse();
 	virtual void ChangeFireType();
+	virtual UCMagComponent* GetCurrentMag();
 
 	virtual class UCGunComponent* GetGunComponent();
 };

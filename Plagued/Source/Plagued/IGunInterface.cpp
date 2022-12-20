@@ -24,6 +24,11 @@ void IIGunInterface::ChangeFireType()
 {
 }
 
+UCMagComponent* IIGunInterface::GetCurrentMag()
+{
+	return {};
+}
+
 UCGunComponent* IIGunInterface::GetGunComponent()
 {
 	return {};

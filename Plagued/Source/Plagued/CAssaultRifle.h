@@ -23,6 +23,8 @@ public:
 	virtual void ReleaseMouse() override;
 
 	virtual void ChangeFireType() override;
+
+	virtual UCMagComponent* GetCurrentMag() override;
 	
 	UPROPERTY(EditAnywhere, Category = "Firing")
 	UNiagaraSystem* MuzzleFlash;
