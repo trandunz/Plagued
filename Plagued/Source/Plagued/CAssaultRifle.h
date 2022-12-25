@@ -6,7 +6,6 @@
 #include "IGunInterface.h"
 #include "GameFramework/Actor.h"
 #include "NiagaraComponent.h"
-#include "../../../../../../../../Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.29.30133/INCLUDE/stdbool.h"
 #include "CAssaultRifle.generated.h"
 
 UCLASS()
