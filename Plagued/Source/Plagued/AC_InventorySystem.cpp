@@ -15,7 +15,7 @@ void UAC_InventorySystem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	DOREPLIFETIME(UAC_InventorySystem, Content);
 }
 
-TSubclassOf<AActor>* UAC_InventorySystem::TryGetItem(FString _rowName)
+FItemStruct* UAC_InventorySystem::TryGetItem(FString _rowName)
 {
 	for (int i = 0; i < Content.Num(); i++)
 	{
@@ -23,9 +23,21 @@ TSubclassOf<AActor>* UAC_InventorySystem::TryGetItem(FString _rowName)
 		{
 			if (FItemStruct* item = ItemData->FindRow<FItemStruct>(FName(_rowName), nullptr))
 			{
-				return &item->ItemClass;
+				if (item->MaxAmmo > 0)
+				{
+					return item;
+				}
 			}
 		}
+	}
+	return {};
+}
+
+FItemStruct* UAC_InventorySystem::TryGetItem(int32 _slot)
+{
+	if (FItemStruct* item = ItemData->FindRow<FItemStruct>(Content[_slot].ItemID, nullptr))
+	{
+		return item;
 	}
 	return {};
 }
@@ -158,5 +170,17 @@ int32 UAC_InventorySystem::AddToInventory(UItemData* _item)
 	}
 
 	return _item->Quantity;
+}
+
+void UAC_InventorySystem::RemoveFromInventory(FName _id)
+{
+	for (int i = 0; i < Content.Num(); i++)
+	{
+		if (Content[i].ItemID == _id)
+		{
+			Content[i].Quantity = 0;
+			break;
+		}
+	}
 }
 

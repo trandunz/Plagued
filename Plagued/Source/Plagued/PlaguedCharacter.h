@@ -197,7 +197,7 @@ public:
 	void ToggleWeapon(AActor* _weapon = nullptr);
 
 	UFUNCTION(BlueprintCallable)
-	void EquipItem(TSubclassOf<AActor> _class);
+	void EquipItem(UDataTable* _itemData, FName _itemID);
 
 	/////////////////////////////////////////////////////////////////////////////////////
 protected:
@@ -245,9 +245,9 @@ protected:
 	void Server_TryMelee_Implementation();
 
 	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_EquipItem(TSubclassOf<AActor> _class);
-	bool Server_EquipItem_Validate(TSubclassOf<AActor> _class);
-	void Server_EquipItem_Implementation(TSubclassOf<AActor> _class);
+	void Server_EquipItem(UDataTable* _itemData, FName _itemID);
+	bool Server_EquipItem_Validate(UDataTable* _itemData, FName _itemID);
+	void Server_EquipItem_Implementation(UDataTable* _itemData, FName _itemID);
 	
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_StartSprint();

@@ -6,6 +6,7 @@
 #include "CGunComponent.h"
 #include "PlaguedCharacter.h"
 #include "AC_InventorySystem.h"
+#include "CMagComponent.h"
 #include "Net/UnrealNetwork.h"
 
 ACAssaultRifle::ACAssaultRifle()
@@ -170,21 +171,35 @@ void ACAssaultRifle::Reload()
 {
 	if (GunComponent->CurrentMag)
 	{
-		GunComponent->CurrentMag->FillMag();
+		UE_LOG(LogTemp, Warning, TEXT("Already Contains Mag"));
+		if (APlaguedCharacter* character = Cast<APlaguedCharacter>(GetAttachParentActor()))
+		{
+			if (FItemStruct* magItem = character->InventorySystem->TryGetItem(character->InventorySystem->AddToInventory(FName("556_Mag"), 1)))
+			{
+				magItem->CurrentAmmo = GunComponent->CurrentMag->CurrentAmmo;
+				magItem->MaxAmmo = GunComponent->CurrentMag->MaxAmmo;
+			}
+		}
+		GunComponent->CurrentMag->CurrentAmmo = 0;
+		GunComponent->CurrentMag->MaxAmmo = 0;
+		GunComponent->CurrentMag->RemoveFromRoot();
+		GunComponent->CurrentMag->DestroyComponent();
+		GunComponent->CurrentMag = nullptr;
 	}
 	else
 	{
-		if (APlaguedCharacter* character = Cast<APlaguedCharacter>(GetNetOwningPlayer()))
+		if (APlaguedCharacter* character = Cast<APlaguedCharacter>(GetAttachParentActor()))
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Player Cast Worked"));
-			if (TSubclassOf<AActor>* magClassFromInventory = character->InventorySystem->TryGetItem("556x45_Mag"))
+			if (FItemStruct* magItem = character->InventorySystem->TryGetItem("556_Mag"))
 			{
 				UE_LOG(LogTemp, Warning, TEXT("Mag Actor Worked"));
-				if (UCMagComponent* mag = Cast<UCMagComponent>(*magClassFromInventory))
-				{
-					UE_LOG(LogTemp, Warning, TEXT("Equip New Mag"));
-					GunComponent->CurrentMag = mag;
-				}
+				GunComponent->CurrentMag = NewObject<UCMagComponent>(this);
+				GunComponent->CurrentMag->RegisterComponent();
+				AddInstanceComponent(GunComponent->CurrentMag);
+				GunComponent->CurrentMag->CurrentAmmo = magItem->CurrentAmmo;
+				GunComponent->CurrentMag->MaxAmmo = magItem->MaxAmmo;
+				character->InventorySystem->RemoveFromInventory(FName("556_Mag"));
 			}
 		}
 		

@@ -37,6 +37,10 @@ public:
 	TSubclassOf<AActor> ItemClass;
 	UPROPERTY(EditAnywhere)
 	int32 StackSize;
+	UPROPERTY(EditAnywhere)
+	int32 CurrentAmmo;
+	UPROPERTY(EditAnywhere)
+	int32 MaxAmmo;
 };
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
@@ -49,8 +53,9 @@ public:
 	UAC_InventorySystem();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-
-	TSubclassOf<AActor>* TryGetItem(FString _rowName);
+	
+	FItemStruct* TryGetItem(FString _rowName);
+	FItemStruct* TryGetItem(int32 _slot);
 	
 	UPROPERTY(Replicated, EditAnywhere)
 	TArray<FSlotStruct> Content;
@@ -76,4 +81,6 @@ public:
 
 	int32 AddToInventory(FName _id, int32 _quantity);
 	int32 AddToInventory(UItemData* _item);
+
+	void RemoveFromInventory(FName _id);
 };

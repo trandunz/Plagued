@@ -22,6 +22,7 @@
 #include "CIKAnimInstance.h"
 #include "ItemData.h"
 #include "CGunComponent.h"
+#include "ItemData.h"
 #include "Net/UnrealNetwork.h"
 
 
@@ -598,30 +599,44 @@ void APlaguedCharacter::ToggleWeapon(AActor* _weapon)
 	}
 }
 
-void APlaguedCharacter::EquipItem(TSubclassOf<AActor> _class)
+void APlaguedCharacter::EquipItem(UDataTable* _itemData, FName _itemID)
 {
 	UE_LOG(LogTemp, Warning, TEXT("Try Equip Item"));
 	
 	if (!HasAuthority())
 	{
-		Server_EquipItem(_class);
+		Server_EquipItem(_itemData, _itemID);
 	}
 	else
 	{
-		if (EquipedItem)
+		if (FItemStruct* item = _itemData->FindRow<FItemStruct>(_itemID, nullptr))
 		{
-			EquipedItem->RemoveFromRoot();
-			EquipedItem->Destroy();
-			EquipedItem = nullptr;
-			RifleEquiped = false;
-		}
-		else if (EquipedItem == nullptr)
-		{
-			EquipedItem = GetWorld()->SpawnActor<AActor>(_class);
-			FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
-			EquipedItem->AttachToComponent(RootComponent, AttachmentRules);
+			if (EquipedItem)
+			{
+				if (UCMagComponent* mag = Cast<UCMagComponent>(EquipedItem))
+				{
+					item->MaxAmmo = mag->MaxAmmo;
+					item->CurrentAmmo = mag->CurrentAmmo;
+				}
+				EquipedItem->RemoveFromRoot();
+				EquipedItem->Destroy();
+				EquipedItem = nullptr;
+				RifleEquiped = false;
+			}
+			else if (EquipedItem == nullptr)
+			{
+				EquipedItem = GetWorld()->SpawnActor<AActor>(item->ItemClass);
+				FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
+				EquipedItem->AttachToComponent(RootComponent, AttachmentRules);
+
+				if (UCMagComponent* mag = Cast<UCMagComponent>(EquipedItem))
+				{
+					mag->MaxAmmo = item->MaxAmmo;
+					mag->CurrentAmmo = item->CurrentAmmo;
+				}
 	
-			ToggleWeapon(EquipedItem);
+				ToggleWeapon(EquipedItem);
+			}
 		}
 	}
 }
@@ -694,27 +709,41 @@ void APlaguedCharacter::Server_TryMelee_Implementation()
 	}
 }
 
-bool APlaguedCharacter::Server_EquipItem_Validate(TSubclassOf<AActor> _class)
+bool APlaguedCharacter::Server_EquipItem_Validate(UDataTable* _itemData, FName _itemID)
 {
 	return true;
 }
 
-void APlaguedCharacter::Server_EquipItem_Implementation(TSubclassOf<AActor> _class)
+void APlaguedCharacter::Server_EquipItem_Implementation(UDataTable* _itemData, FName _itemID)
 {
-	if (EquipedItem)
+	if (FItemStruct* item = _itemData->FindRow<FItemStruct>(_itemID, nullptr))
 	{
-		EquipedItem->RemoveFromRoot();
-		EquipedItem->Destroy();
-		EquipedItem = nullptr;
-		RifleEquiped = false;
-	}
-	else if (EquipedItem == nullptr)
-	{
-		EquipedItem = GetWorld()->SpawnActor<AActor>(_class);
-		FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
-		EquipedItem->AttachToComponent(RootComponent, AttachmentRules);
+		if (EquipedItem)
+		{
+			if (UCMagComponent* mag = Cast<UCMagComponent>(EquipedItem))
+			{
+				item->MaxAmmo = mag->MaxAmmo;
+				item->CurrentAmmo = mag->CurrentAmmo;
+			}
+			EquipedItem->RemoveFromRoot();
+			EquipedItem->Destroy();
+			EquipedItem = nullptr;
+			RifleEquiped = false;
+		}
+		else if (EquipedItem == nullptr)
+		{
+			EquipedItem = GetWorld()->SpawnActor<AActor>(item->ItemClass);
+			FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
+			EquipedItem->AttachToComponent(RootComponent, AttachmentRules);
+
+			if (UCMagComponent* mag = Cast<UCMagComponent>(EquipedItem))
+			{
+				mag->MaxAmmo = item->MaxAmmo;
+				mag->CurrentAmmo = item->CurrentAmmo;
+			}
 	
-		ToggleWeapon(EquipedItem);
+			ToggleWeapon(EquipedItem);
+		}
 	}
 }
 
