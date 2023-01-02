@@ -58,12 +58,20 @@ public:
 	
 	UPROPERTY(BlueprintReadWrite, Category= "Variables")
 	FTransform RelativeHandTransform;
+
+	UPROPERTY(BlueprintReadWrite, Category= "Variables")
+	FTransform LeftHandIK;
+
+	UPROPERTY(EditAnywhere)
+	FString HandBoneName = "hand_r";
 	
 protected:
 	void Default();
 	void SetCharacter(class APlaguedCharacter* character);
 	void SetSightTransform();
 	void SetRelativeHandTransform();
+
+	void SetLeftHandTransform();
 
 	UFUNCTION()
 	void SetAimRatio(float _ratio);

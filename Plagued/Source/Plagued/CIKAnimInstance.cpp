@@ -28,6 +28,7 @@ void UCIKAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		{
 			SetSightTransform();
 			SetRelativeHandTransform();
+			SetLeftHandTransform();
 
 			AimTimeline.Play();
 		}
@@ -102,8 +103,7 @@ void UCIKAnimInstance::SetSightTransform()
 	SightTransform.SetRotation(relative.Rotator().Quaternion());
 	SightTransform.SetScale3D({1,1,1});
 
-	if (Character && !Character->HasAuthority())
-		UE_LOG(LogTemp, Warning, TEXT("SightTransform: %s"), *SightTransform.ToString());
+	UE_LOG(LogTemp, Warning, TEXT("SightTransform: %s"), *SightTransform.ToString());
 }
 
 void UCIKAnimInstance::SetRelativeHandTransform()
@@ -112,15 +112,30 @@ void UCIKAnimInstance::SetRelativeHandTransform()
 	{
 		if (USkeletalMeshComponent* mesh = Cast<USkeletalMeshComponent>(Character->EquipedItem->GetComponentByClass(USkeletalMeshComponent::StaticClass())))
 		{
-			FTransform meshTransform = Character->GetMesh()->GetSocketTransform(FName("RightHand"));
+			FTransform meshTransform = Character->GetMesh()->GetSocketTransform(FName(HandBoneName));
 			FTransform opticSocketTransform = mesh->GetSocketTransform(FName("S_Sight"));
 			RelativeHandTransform = UKismetMathLibrary::MakeRelativeTransform(opticSocketTransform,meshTransform);
 			
-			if (Character && !Character->HasAuthority())
-				UE_LOG(LogTemp, Warning, TEXT("RelativeHandTransform: %s"), *RelativeHandTransform.ToString());
+			UE_LOG(LogTemp, Warning, TEXT("RelativeHandTransform: %s"), *RelativeHandTransform.ToString());
 		}
 	}
 	
+}
+
+void UCIKAnimInstance::SetLeftHandTransform()
+{
+	if (Character)
+	{
+		FTransform rHandTransform = Character->GetMesh()->GetSocketTransform(FName(HandBoneName));
+		if (Character->EquipedItem)
+		{
+			if (USkeletalMeshComponent* mesh = Cast<USkeletalMeshComponent>(Character->EquipedItem->GetComponentByClass(USkeletalMeshComponent::StaticClass())))
+			{
+				FTransform lHandSocketTransform = mesh->GetSocketTransform(FName("S_LeftHand"));
+				LeftHandIK = UKismetMathLibrary::MakeRelativeTransform(lHandSocketTransform,rHandTransform);
+			}
+		}
+	}
 }
 
 void UCIKAnimInstance::SetAimRatio(float _ratio)

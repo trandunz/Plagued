@@ -46,7 +46,7 @@ APlaguedCharacter::APlaguedCharacter()
 	Arm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
 	Arm->TargetArmLength = 150.0f;
 	Arm->SetRelativeRotation(FRotator(-45.0f, 0.0f, 0.0f));
-	Arm->AttachToComponent(GetMesh(), AttachmentRules, FName("Head"));
+	Arm->AttachToComponent(GetMesh(), AttachmentRules, FName(HeadBoneName));
 	Arm->SocketOffset = {0,70,-20};
 
 	GetCharacterMovement()->SetIsReplicated(true);
@@ -93,8 +93,9 @@ void APlaguedCharacter::BeginPlay()
 	ToggleHUD();
 
 	AnimationInstance = Cast<UCIKAnimInstance>(GetMesh()->GetAnimInstance());
-	
-	PlayerHUD->ShowAmmoText(false);
+
+	if (PlayerHUD)
+		PlayerHUD->ShowAmmoText(false);
 }
 
 void APlaguedCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -190,7 +191,7 @@ void APlaguedCharacter::AttachCameraToTPP()
 void APlaguedCharacter::AttachCameraToFPP()
 {
 	FAttachmentTransformRules AttachmentRules(EAttachmentRule::KeepRelative, false);
-	FirstPersonCameraComponent->AttachToComponent(GetMesh(), AttachmentRules, FName("Head"));
+	FirstPersonCameraComponent->AttachToComponent(GetMesh(), AttachmentRules, FName(HeadBoneName));
 }
 
 void APlaguedCharacter::ChangePerspective()

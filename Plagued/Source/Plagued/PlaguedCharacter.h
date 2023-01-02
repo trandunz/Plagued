@@ -117,6 +117,9 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	float FireRate = 0.1;
+	
+	UPROPERTY(EditAnywhere)
+	FString HeadBoneName = "head";
 protected:
 	virtual void BeginPlay();
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
